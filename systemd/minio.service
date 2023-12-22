@@ -1,0 +1,18 @@
+[Unit]
+Description="Minio Service"
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Environment=MINIO_VOLUMES={{.ServerPools}}
+EnvironmentFile=-/etc/minio/env
+User=minio
+Group=minio
+Type=simple
+Restart=always
+RestartSec=1
+ExecStart={{.MinioPath}} server --certs-dir /etc/minio/tls
+
+[Install]
+WantedBy=multi-user.target
