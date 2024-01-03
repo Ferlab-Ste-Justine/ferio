@@ -11,16 +11,18 @@ The following assumption is made: Changes (binary updates or server pool additio
 ## Boot
 
 When a ferio boot, if a minio service file is absent:
-- Get the latest binary update + download the binary
-- Get the latest server pool
+- Get the binary release info + download the binary
+- Get the server pools info
 - Generate the minio service file
-- Check if there is a pool synchronization in progress and if so, synchronize on pool change + start minio
+- Check if there is a server pools synchronization in progress and if so, synchronize on server pools change + start minio
 - Check if there is a binary update in progress and if so, synchronize on binary update + start minio
 - Make sure minio is started
 - Follow runtime procedure
 
-When a ferio boot, if a minio service file is present: 
-- Check if there is a pool synchronization in progress and if so, synchronize on pool change + start minio
+When a ferio boot, if a minio service file is present:
+- Get the server pools info
+- Get the binary release info
+- Check if there is a server pools synchronization in progress and if so, synchronize on pool change + start minio
 - Check if there is a binary update in progress and if so, synchronize on binary update + start minio
 - Follow runtime procedure
 
@@ -29,7 +31,7 @@ Follow runtime procedure
 ## Runtime
 
 When a node runs, it will:
-- Listen on pool change if updated: Synchronize on pool change + start minio
+- Listen on server pools change if updated: Synchronize on server pools change + start minio
 - Listen on binary update and if updated: Synchronize on binary update + start minio
 
 # Synchronization tasks
