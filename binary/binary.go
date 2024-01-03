@@ -119,5 +119,9 @@ func GetMinioPath(binariesDir string) (string, error) {
 		return "", errors.New(fmt.Sprintf("Error occured while fetching the last minio binary: %s", binDirsErr.Error()))
 	}
 
+	if len(binDirs) == 0 {
+		return "", nil
+	}
+
 	return path.Join(binDirs[len(binDirs) - 1], "minio"), nil
 }
