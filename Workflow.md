@@ -15,16 +15,17 @@ When a ferio boot, if a minio service file is absent:
 - Get the server pools info
 - Download the minio binary
 - Generate the minio service file
-- Check if there is a server pools synchronization in progress and if so, synchronize on server pools change + start minio
-- Check if there is a binary update in progress and if so, synchronize on binary update + start minio
-- Make sure minio is started
+- Check if there is a server pools synchronization in progress and if so, synchronize on server pools change
+- Check if there is a binary update in progress and if so, synchronize on binary update
+- Start minio
 - Follow runtime procedure
 
 When a ferio boot, if a minio service file is present:
 - Get the server pools info
 - Get the binary release info
-- Check if there is a server pools synchronization in progress and if so, synchronize on pool change + start minio
-- Check if there is a binary update in progress and if so, synchronize on binary update + start minio
+- Check if there is a server pools synchronization in progress and if so, synchronize on pool change
+- Check if there is a binary update in progress and if so, synchronize on binary update
+- Start minio if it is not running
 - Follow runtime procedure
 
 ## Runtime

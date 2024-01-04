@@ -28,7 +28,7 @@ func (tk *Task) CanContinue(pools *MinioServerPools) bool {
 	return tk.Complete || int64(len(tk.Completers)) == pools.CountHosts()
 }
 
-func GetTaskStatus(cli *client.EtcdClient, taskPrefix string) (*Task, int64, error) {
+func GetTask(cli *client.EtcdClient, taskPrefix string) (*Task, int64, error) {
 	tk := Task{false, []string{}}
 	
 	gr := client.Group{KeyPrefix: fmt.Sprintf(ETCD_TASK_COMPLETERS_PREFIX, taskPrefix)}

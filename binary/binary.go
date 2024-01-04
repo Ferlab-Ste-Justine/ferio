@@ -66,6 +66,10 @@ func downloadBinary(binaryUrl string, binaryPath string, retries int) error {
 	return nil
 }
 
+func GetMinioPathFromVersion(binariesDir string, minioVersion string) string {
+	return path.Join(binariesDir, minioVersion, "minio")
+}
+
 func GetBinary(minioUrl string, minioVersion string, expectedSha string, binariesDir string) error {
 	binDir := path.Join(binariesDir, minioVersion)
 	binPath := path.Join(binDir, "minio")

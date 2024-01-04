@@ -46,28 +46,28 @@ func (rel *MinioRelease) getTaskKeys(prefix string) (string, string, string) {
 	fmt.Sprintf(ETCD_RELEASE_TASKS_SYSTEMD_UPDATE_KEY, prefix, rel.Version)
 }
 
-type ReleaseUpdateStatus struct {
+type ReleaseUpdate struct {
 	DownloadDone       bool
 	MinioShutdownDone  bool
 	SystemdUpdateDone  bool
 	CurrentTaskStatus  *Task
 }
 
-func (status *ReleaseUpdateStatus) IsDone() bool {
-	return status.DownloadDone && status.MinioShutdownDone && status.SystemdUpdateDone
+func (upd *ReleaseUpdate) IsDone() bool {
+	return upd.DownloadDone && upd.MinioShutdownDone && upd.SystemdUpdateDone
 }
 
-func (rel *MinioRelease) GetUpdateStatus(cli *client.EtcdClient, prefix string, pools *MinioServerPools) (*ReleaseUpdateStatus, error) {
+func (rel *MinioRelease) GetUpdate(cli *client.EtcdClient, prefix string, pools *MinioServerPools) (*ReleaseUpdate, error) {
 	downloadKey, shutdownKey, systemdKey := rel.getTaskKeys(prefix)
 
 	for _, key := range []string{downloadKey, shutdownKey, systemdKey} {
-		tk, _, err := GetTaskStatus(cli, key)
+		tk, _, err := GetTask(cli, key)
 		if err != nil {
 			return nil, err
 		}
 
 		if !tk.CanContinue(pools) {
-			return &ReleaseUpdateStatus{
+			return &ReleaseUpdate{
 				DownloadDone:      key != downloadKey,
 				MinioShutdownDone: key != downloadKey && key != shutdownKey,
 				SystemdUpdateDone: false,
@@ -76,7 +76,7 @@ func (rel *MinioRelease) GetUpdateStatus(cli *client.EtcdClient, prefix string, 
 		}
 	}
 
-	return &ReleaseUpdateStatus{
+	return &ReleaseUpdate{
 		DownloadDone:      true,
 		MinioShutdownDone: true,
 		SystemdUpdateDone: true,
@@ -84,8 +84,8 @@ func (rel *MinioRelease) GetUpdateStatus(cli *client.EtcdClient, prefix string, 
 	}, nil
 }
 
-func (rel *MinioRelease) HandleNextTask(cli *client.EtcdClient, prefix string, status *ReleaseUpdateStatus, pools *MinioServerPools, host string, action TaskAction) error {	
-	if status.CurrentTaskStatus.HasToDo(host) {
+func (upd *ReleaseUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, rel *MinioRelease, pools *MinioServerPools, host string, action TaskAction) error {	
+	if upd.CurrentTaskStatus.HasToDo(host) {
 		err := action()
 		if err != nil {
 			return err
@@ -103,27 +103,27 @@ func (rel *MinioRelease) HandleNextTask(cli *client.EtcdClient, prefix string, s
 	}
 
 	downloadKey, shutdownKey, systemdKey := rel.getTaskKeys(prefix)
-	if !status.DownloadDone {
-		status.DownloadDone = true
-		tk, _, err := GetTaskStatus(cli, downloadKey)
+	if !upd.DownloadDone {
+		upd.DownloadDone = true
+		tk, _, err := GetTask(cli, downloadKey)
 		if err != nil {
 			return err
 		}
-		status.CurrentTaskStatus = tk
-	} else if !status.MinioShutdownDone {
-		status.MinioShutdownDone = true
-		tk, _, err := GetTaskStatus(cli, shutdownKey)
+		upd.CurrentTaskStatus = tk
+	} else if !upd.MinioShutdownDone {
+		upd.MinioShutdownDone = true
+		tk, _, err := GetTask(cli, shutdownKey)
 		if err != nil {
 			return err
 		}
-		status.CurrentTaskStatus = tk
+		upd.CurrentTaskStatus = tk
 	} else {
-		status.SystemdUpdateDone = true
-		tk, _, err := GetTaskStatus(cli, systemdKey)
+		upd.SystemdUpdateDone = true
+		tk, _, err := GetTask(cli, systemdKey)
 		if err != nil {
 			return err
 		}
-		status.CurrentTaskStatus = tk
+		upd.CurrentTaskStatus = tk
 	}
 
 	return nil

@@ -10,6 +10,7 @@ import (
 	"github.com/Ferlab-Ste-Justine/ferio/etcd"
 	"github.com/Ferlab-Ste-Justine/ferio/fs"
 	"github.com/Ferlab-Ste-Justine/ferio/systemd"
+	"github.com/Ferlab-Ste-Justine/ferio/update"
 
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
@@ -67,15 +68,12 @@ func Startup(cli *client.EtcdClient, conf config.Config) (*etcd.MinioServerPools
 		return nil, nil, serviceExistsErr
 	}
 
+	minPath := binary.GetMinioPathFromVersion(conf.BinariesDir, rel.Version)
+
 	if !serviceExists {
 		downErr := binary.GetBinary(rel.Url, rel.Version, rel.Checksum, conf.BinariesDir)
 		if downErr != nil {
 			return nil, nil, downErr
-		}
-
-		minPath, minPathErr := binary.GetMinioPath(conf.BinariesDir)
-		if minPathErr != nil {
-			return nil, nil, minPathErr
 		}
 
 		refrErr := systemd.RefreshMinioSystemdUnit(minPath, pools)
@@ -84,7 +82,20 @@ func Startup(cli *client.EtcdClient, conf config.Config) (*etcd.MinioServerPools
 		}
 	}
 
-	//To finish
+	_, updErr := update.UpdatePools(cli, conf.Etcd.WorkspacePrefix, minPath, pools, conf.Host)
+	if updErr != nil {
+		return nil, nil, updErr
+	}
+
+	_, updErr = update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, rel, pools, conf.Host)
+	if updErr != nil {
+		return nil, nil, updErr
+	}
+
+	startErr := systemd.StartMinio()
+	if startErr != nil {
+		return nil, nil, startErr
+	}
 
 	return pools, rel, nil
 }

@@ -89,28 +89,28 @@ func (pools *MinioServerPools) getTaskKeys(prefix string) (string, string, strin
 	fmt.Sprintf(ETCD_POOLS_TASKS_SYSTEMD_UPDATE_KEY, prefix, pools.Version)
 }
 
-type PoolsUpdateStatus struct {
+type PoolsUpdate struct {
 	AcknowledgmentDone bool
 	MinioShutdownDone  bool
 	SystemdUpdateDone  bool
 	CurrentTaskStatus  *Task
 }
 
-func (status *PoolsUpdateStatus) IsDone() bool {
-	return status.AcknowledgmentDone && status.MinioShutdownDone && status.SystemdUpdateDone
+func (upd *PoolsUpdate) IsDone() bool {
+	return upd.AcknowledgmentDone && upd.MinioShutdownDone && upd.SystemdUpdateDone
 }
 
-func (pools *MinioServerPools) GetUpdateStatus(cli *client.EtcdClient, prefix string) (*PoolsUpdateStatus, error) {
+func (pools *MinioServerPools) GetUpdate(cli *client.EtcdClient, prefix string) (*PoolsUpdate, error) {
 	ackKey, shutdownKey, systemdKey := pools.getTaskKeys(prefix)
 	
 	for _, key := range []string{ackKey, shutdownKey, systemdKey} {
-		tk, _, err := GetTaskStatus(cli, key)
+		tk, _, err := GetTask(cli, key)
 		if err != nil {
 			return nil, err
 		}
 
 		if !tk.CanContinue(pools) {
-			return &PoolsUpdateStatus{
+			return &PoolsUpdate{
 				AcknowledgmentDone: key != ackKey,
 				MinioShutdownDone: key != ackKey && key != shutdownKey,
 				SystemdUpdateDone: false,
@@ -119,7 +119,7 @@ func (pools *MinioServerPools) GetUpdateStatus(cli *client.EtcdClient, prefix st
 		}
 	}
 
-	return &PoolsUpdateStatus{
+	return &PoolsUpdate{
 		AcknowledgmentDone: true,
 		MinioShutdownDone: true,
 		SystemdUpdateDone: true,
@@ -127,8 +127,8 @@ func (pools *MinioServerPools) GetUpdateStatus(cli *client.EtcdClient, prefix st
 	}, nil
 }
 
-func (pools *MinioServerPools) HandleNextTask(cli *client.EtcdClient, prefix string, status *PoolsUpdateStatus, host string, action TaskAction) error {	
-	if status.CurrentTaskStatus.HasToDo(host) {
+func (upd *PoolsUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, pools *MinioServerPools, host string, action TaskAction) error {	
+	if upd.CurrentTaskStatus.HasToDo(host) {
 		err := action()
 		if err != nil {
 			return err
@@ -146,27 +146,27 @@ func (pools *MinioServerPools) HandleNextTask(cli *client.EtcdClient, prefix str
 	}
 
 	ackKey, shutdownKey, systemdKey := pools.getTaskKeys(prefix)
-	if !status.AcknowledgmentDone {
-		status.AcknowledgmentDone = true
-		tk, _, err := GetTaskStatus(cli, ackKey)
+	if !upd.AcknowledgmentDone {
+		upd.AcknowledgmentDone = true
+		tk, _, err := GetTask(cli, ackKey)
 		if err != nil {
 			return err
 		}
-		status.CurrentTaskStatus = tk
-	} else if !status.MinioShutdownDone {
-		status.MinioShutdownDone = true
-		tk, _, err := GetTaskStatus(cli, shutdownKey)
+		upd.CurrentTaskStatus = tk
+	} else if !upd.MinioShutdownDone {
+		upd.MinioShutdownDone = true
+		tk, _, err := GetTask(cli, shutdownKey)
 		if err != nil {
 			return err
 		}
-		status.CurrentTaskStatus = tk
+		upd.CurrentTaskStatus = tk
 	} else {
-		status.SystemdUpdateDone = true
-		tk, _, err := GetTaskStatus(cli, systemdKey)
+		upd.SystemdUpdateDone = true
+		tk, _, err := GetTask(cli, systemdKey)
 		if err != nil {
 			return err
 		}
-		status.CurrentTaskStatus = tk
+		upd.CurrentTaskStatus = tk
 	}
 
 	return nil
