@@ -5,10 +5,13 @@ import (
 	"os"
 	"time"
 
-	//"github.com/Ferlab-Ste-Justine/ferio/binary"
+	"github.com/Ferlab-Ste-Justine/ferio/binary"
 	"github.com/Ferlab-Ste-Justine/ferio/config"
 	"github.com/Ferlab-Ste-Justine/ferio/etcd"
 	"github.com/Ferlab-Ste-Justine/ferio/fs"
+	"github.com/Ferlab-Ste-Justine/ferio/systemd"
+
+	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
 func EnsureBinariesDirExist(binsDir string) error {
@@ -48,6 +51,49 @@ func CleanupBinariesDir(binsDir string, conf config.BinariesCleanupConfig) {
 	}()
 }
 
+func Startup(cli *client.EtcdClient, conf config.Config) (*etcd.MinioServerPools, *etcd.MinioRelease, error) {
+	pools, _, poolsErr := etcd.GetMinioServerPools(cli, conf.Etcd.ConfigPrefix)
+	if poolsErr != nil {
+		return nil, nil, poolsErr
+	}
+
+	rel, _, relErr := etcd.GetMinioRelease(cli, conf.Etcd.ConfigPrefix)
+	if relErr != nil {
+		return nil, nil, relErr
+	}
+
+	serviceExists, serviceExistsErr := systemd.MinioServiceExists()
+	if serviceExistsErr != nil {
+		return nil, nil, serviceExistsErr
+	}
+
+	if !serviceExists {
+		downErr := binary.GetBinary(rel.Url, rel.Version, rel.Checksum, conf.BinariesDir)
+		if downErr != nil {
+			return nil, nil, downErr
+		}
+
+		minPath, minPathErr := binary.GetMinioPath(conf.BinariesDir)
+		if minPathErr != nil {
+			return nil, nil, minPathErr
+		}
+
+		refrErr := systemd.RefreshMinioSystemdUnit(minPath, pools)
+		if refrErr != nil {
+			return nil, nil, refrErr
+		}
+	}
+
+	//To finish
+
+	return pools, rel, nil
+}
+
+func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.MinioServerPools, startRel *etcd.MinioRelease) error {
+	//To do
+	return nil
+}
+
 func main() {
 	conf, configErr := config.GetConfig()
 	if configErr != nil {
@@ -70,45 +116,15 @@ func main() {
 	}
 	defer cli.Close()
 
-	/*time.Sleep(10 * time.Second)
-	getBinErr := binary.GetBinary(
-		"https://dl.min.io/server/minio/release/linux-amd64/minio.RELEASE.2023-12-20T01-00-02Z", 
-		"2023-12-20",
-		"09fafaf399885b4912bafda6fa03fc4ccbc39ec45e17239677217317915d6aeb",
-		conf.BinariesDir,
-	)
-	if getBinErr != nil {
-		fmt.Println(getBinErr.Error())
+	startPools, startRel, err := Startup(cli, conf)
+	if err != nil {
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	getBinErr = binary.GetBinary(
-		"https://dl.min.io/server/minio/release/linux-amd64/minio.RELEASE.2023-12-20T01-00-02Z", 
-		"2023-11-19",
-		"09fafaf399885b4912bafda6fa03fc4ccbc39ec45e17239677217317915d6aeb",
-		conf.BinariesDir,
-	)
-	if getBinErr != nil {
-		fmt.Println(getBinErr.Error())
+	err = RuntimeLoop(cli, conf, startPools, startRel)
+	if err != nil {
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-
-	getBinErr = binary.GetBinary(
-		"https://dl.min.io/server/minio/release/linux-amd64/minio.RELEASE.2023-12-20T01-00-02Z", 
-		"2022-11-19",
-		"09fafaf399885b4912bafda6fa03fc4ccbc39ec45e17239677217317915d6aeb",
-		conf.BinariesDir,
-	)
-	if getBinErr != nil {
-		fmt.Println(getBinErr.Error())
-		os.Exit(1)
-	}
-
-	minPath, minPathErr := binary.GetMinioPath(conf.BinariesDir)
-	if minPathErr != nil {
-		fmt.Println(minPathErr.Error())
-		os.Exit(1)
-	}
-
-	fmt.Println(minPath)*/
 }

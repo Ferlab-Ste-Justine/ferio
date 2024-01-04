@@ -8,11 +8,12 @@ The following assumption is made: Changes (binary updates or server pool additio
 
 # Workflow
 
-## Boot
+## Startup
 
 When a ferio boot, if a minio service file is absent:
-- Get the binary release info + download the binary
+- Get the binary release info
 - Get the server pools info
+- Download the minio binary
 - Generate the minio service file
 - Check if there is a server pools synchronization in progress and if so, synchronize on server pools change + start minio
 - Check if there is a binary update in progress and if so, synchronize on binary update + start minio
@@ -25,8 +26,6 @@ When a ferio boot, if a minio service file is present:
 - Check if there is a server pools synchronization in progress and if so, synchronize on pool change + start minio
 - Check if there is a binary update in progress and if so, synchronize on binary update + start minio
 - Follow runtime procedure
-
-Follow runtime procedure
 
 ## Runtime
 

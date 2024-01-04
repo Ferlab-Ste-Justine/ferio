@@ -16,24 +16,24 @@ type MinioRelease struct {
 	Checksum string
 }
 
-func GetMinioRelease(cli *client.EtcdClient, prefix string) (*MinioRelease, error) {
+func GetMinioRelease(cli *client.EtcdClient, prefix string) (*MinioRelease, int64, error) {
 	var rel MinioRelease
 	
 	info, err := cli.GetKey(fmt.Sprintf(ETCD_RELEASE_CONFIG_KEY, prefix), client.GetKeyOptions{})
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 
 	if !info.Found() {
-		return nil, errors.New("Minio release configuration is not set")
+		return nil, -1, errors.New("Minio release configuration is not set")
 	}
 
 	err = yaml.Unmarshal([]byte(info.Value), &rel)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error parsing the minio release configuration: %s", err.Error()))
+		return nil, -1, errors.New(fmt.Sprintf("Error parsing the minio release configuration: %s", err.Error()))
 	}
 
-	return &rel, nil
+	return &rel, info.ModRevision, nil
 }
 
 const ETCD_RELEASE_TASKS_BINARY_DOWNLOAD_KEY = "%s/tasks/binary/%s/binary_download"

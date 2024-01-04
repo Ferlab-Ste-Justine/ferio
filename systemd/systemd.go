@@ -1,9 +1,12 @@
 package systemd
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"path"
 	"text/template"
 
@@ -24,10 +27,10 @@ type UnitFileTemplate struct {
 	MinioPath string
 }
 
-func RefreshMinioSystemdUnit(minioPath string, serverPools etcd.MinioServerPools) error {
+func RefreshMinioSystemdUnit(minioPath string, serverPools *etcd.MinioServerPools) error {
 	tmpl, tErr := template.New("template").Parse(minioUnitTemplate)
 	if tErr != nil {
-		return "", tErr
+		return tErr
 	}
 
 	var b bytes.Buffer
@@ -70,10 +73,10 @@ func MinioServiceExists() (bool, error) {
 
 	statuses, listErr := conn.ListUnitsByNamesContext(context.Background(), []string{"minio.service"})
 	if listErr != nil {
-		return false, listEr
+		return false, listErr
 	}
 
-	return len(statuses) > 0
+	return len(statuses) > 0, nil
 }
 
 func StopMinio() error {
@@ -82,7 +85,7 @@ func StopMinio() error {
 		return existsErr
 	}
 	if !exists {
-		retur nil
+		return nil
 	}
 	
 	conn, connErr := dbus.NewSystemdConnectionContext(context.Background())
@@ -116,7 +119,7 @@ func StartMinio() error {
 		return existsErr
 	}
 	if !exists {
-		retur nil
+		return nil
 	}
 
 	conn, connErr := dbus.NewSystemdConnectionContext(context.Background())
@@ -127,7 +130,7 @@ func StartMinio() error {
 
 	output := make(chan string)
 	defer close(output)
-	_, startErr := conn.StartUnitContext(context.Background(), key, "replace", output)
+	_, startErr := conn.StartUnitContext(context.Background(), "minio.service", "replace", output)
 	if startErr != nil {
 		return startErr
 	}

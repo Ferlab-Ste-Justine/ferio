@@ -59,24 +59,24 @@ func (pools *MinioServerPools) Stringify() string {
 	return strings.Join(stringifiedPools, " ")
 }
 
-func GetMinioServerPools(cli *client.EtcdClient, prefix string) (*MinioServerPools, error) {
+func GetMinioServerPools(cli *client.EtcdClient, prefix string) (*MinioServerPools, int64, error) {
 	var pools MinioServerPools
 	
 	info, err := cli.GetKey(fmt.Sprintf(ETCD_POOLS_CONFIG_KEY, prefix), client.GetKeyOptions{})
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 
 	if !info.Found() {
-		return nil, errors.New("Minio server pools configuration is not set")
+		return nil, -1, errors.New("Minio server pools configuration is not set")
 	}
 
 	err = yaml.Unmarshal([]byte(info.Value), &pools)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error parsing the server pools configuration: %s", err.Error()))
+		return nil, -1, errors.New(fmt.Sprintf("Error parsing the server pools configuration: %s", err.Error()))
 	}
 
-	return &pools, nil
+	return &pools, info.ModRevision, nil
 }
 
 const ETCD_POOLS_TASKS_ACKNOWLEDGMENT_KEY = "%s/tasks/pools/%s/acknowledgment"
