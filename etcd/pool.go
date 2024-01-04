@@ -96,51 +96,78 @@ type PoolsUpdateStatus struct {
 	CurrentTaskStatus  *Task
 }
 
+func (status *PoolsUpdateStatus) IsDone() bool {
+	return status.AcknowledgmentDone && status.MinioShutdownDone && status.SystemdUpdateDone
+}
+
 func (pools *MinioServerPools) GetUpdateStatus(cli *client.EtcdClient, prefix string) (*PoolsUpdateStatus, error) {
 	ackKey, shutdownKey, systemdKey := pools.getTaskKeys(prefix)
-	tk, _, err := GetTaskStatus(cli, ackKey)
-	if err != nil {
-		return nil, err
-	}
-	if !tk.CanContinue(pools) {
-		return PoolsUpdateStatus{
-			AcknowledgmentDone: false,
-			MinioShutdownDone: false,
-			SystemdUpdateDone: false,
-			CurrentTaskStatus: tk,
-		}, nil
+	
+	for _, key := range []string{ackKey, shutdownKey, systemdKey} {
+		tk, _, err := GetTaskStatus(cli, key)
+		if err != nil {
+			return nil, err
+		}
+
+		if !tk.CanContinue(pools) {
+			return &PoolsUpdateStatus{
+				AcknowledgmentDone: key != ackKey,
+				MinioShutdownDone: key != ackKey && key != shutdownKey,
+				SystemdUpdateDone: false,
+				CurrentTaskStatus: tk,
+			}, nil
+		}
 	}
 
-	tk, _, err = GetTaskStatus(cli, shutdownKey)
-	if err != nil {
-		return nil, err
-	}
-	if !tk.CanContinue(pools) {
-		return PoolsUpdateStatus{
-			AcknowledgmentDone: true,
-			MinioShutdownDone: false,
-			SystemdUpdateDone: false,
-			CurrentTaskStatus: tk,
-		}, nil
-	}
-
-	tk, _, err = GetTaskStatus(cli, systemdKey)
-	if err != nil {
-		return nil, err
-	}
-	if !tk.CanContinue(pools) {
-		return PoolsUpdateStatus{
-			AcknowledgmentDone: true,
-			MinioShutdownDone: true,
-			SystemdUpdateDone: false,
-			CurrentTaskStatus: tk,
-		}, nil
-	}
-
-	return PoolsUpdateStatus{
+	return &PoolsUpdateStatus{
 		AcknowledgmentDone: true,
 		MinioShutdownDone: true,
 		SystemdUpdateDone: true,
 		CurrentTaskStatus: nil,
 	}, nil
+}
+
+func (pools *MinioServerPools) HandleNextTask(cli *client.EtcdClient, prefix string, status *PoolsUpdateStatus, host string, action TaskAction) error {	
+	if status.CurrentTaskStatus.HasToDo(host) {
+		err := action()
+		if err != nil {
+			return err
+		}
+
+		err = MarkTaskDoneBySelf(cli, prefix, host)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := WaitOnTaskCompletion(cli, prefix, pools.CountHosts())
+	if err != nil {
+		return err
+	}
+
+	ackKey, shutdownKey, systemdKey := pools.getTaskKeys(prefix)
+	if !status.AcknowledgmentDone {
+		status.AcknowledgmentDone = true
+		tk, _, err := GetTaskStatus(cli, ackKey)
+		if err != nil {
+			return err
+		}
+		status.CurrentTaskStatus = tk
+	} else if !status.MinioShutdownDone {
+		status.MinioShutdownDone = true
+		tk, _, err := GetTaskStatus(cli, shutdownKey)
+		if err != nil {
+			return err
+		}
+		status.CurrentTaskStatus = tk
+	} else {
+		status.SystemdUpdateDone = true
+		tk, _, err := GetTaskStatus(cli, systemdKey)
+		if err != nil {
+			return err
+		}
+		status.CurrentTaskStatus = tk
+	}
+
+	return nil
 }

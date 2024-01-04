@@ -50,54 +50,81 @@ type ReleaseUpdateStatus struct {
 	DownloadDone       bool
 	MinioShutdownDone  bool
 	SystemdUpdateDone  bool
-	CurrentTaskStatus  Task
+	CurrentTaskStatus  *Task
 }
 
-func (rel *MinioRelease) GetUpdateStatus(cli *client.EtcdClient, prefix string, pools *MinioServerPools) (ReleaseUpdateStatus, error) {
+func (status *ReleaseUpdateStatus) IsDone() bool {
+	return status.DownloadDone && status.MinioShutdownDone && status.SystemdUpdateDone
+}
+
+func (rel *MinioRelease) GetUpdateStatus(cli *client.EtcdClient, prefix string, pools *MinioServerPools) (*ReleaseUpdateStatus, error) {
 	downloadKey, shutdownKey, systemdKey := rel.getTaskKeys(prefix)
-	tk, _, err := GetTaskStatus(cli, downloadKey)
-	if err != nil {
-		return nil, err
-	}
-	if !tk.CanContinue(pools) {
-		return ReleaseUpdateStatus{
-			DownloadDone:      false,
-			MinioShutdownDone: false,
-			SystemdUpdateDone: false,
-			CurrentTaskStatus: tk,
-		}, nil
+
+	for _, key := range []string{downloadKey, shutdownKey, systemdKey} {
+		tk, _, err := GetTaskStatus(cli, key)
+		if err != nil {
+			return nil, err
+		}
+
+		if !tk.CanContinue(pools) {
+			return &ReleaseUpdateStatus{
+				DownloadDone:      key != downloadKey,
+				MinioShutdownDone: key != downloadKey && key != shutdownKey,
+				SystemdUpdateDone: false,
+				CurrentTaskStatus: tk,
+			}, nil
+		}
 	}
 
-	tk, _, err = GetTaskStatus(cli, shutdownKey)
-	if err != nil {
-		return nil, err
-	}
-	if !tk.CanContinue(pools) {
-		return ReleaseUpdateStatus{
-			DownloadDone:      true,
-			MinioShutdownDone: false,
-			SystemdUpdateDone: false,
-			CurrentTaskStatus: tk,
-		}, nil
-	}
-
-	tk, _, err = GetTaskStatus(cli, systemdKey)
-	if err != nil {
-		return nil, err
-	}
-	if !tk.CanContinue(pools) {
-		return ReleaseUpdateStatus{
-			DownloadDone:      true,
-			MinioShutdownDone: true,
-			SystemdUpdateDone: false,
-			CurrentTaskStatus: tk,
-		}, nil
-	}
-
-	return PoolsUpdateStatus{
+	return &ReleaseUpdateStatus{
 		DownloadDone:      true,
 		MinioShutdownDone: true,
 		SystemdUpdateDone: true,
 		CurrentTaskStatus: nil,
 	}, nil
+}
+
+func (rel *MinioRelease) HandleNextTask(cli *client.EtcdClient, prefix string, status *ReleaseUpdateStatus, pools *MinioServerPools, host string, action TaskAction) error {	
+	if status.CurrentTaskStatus.HasToDo(host) {
+		err := action()
+		if err != nil {
+			return err
+		}
+
+		err = MarkTaskDoneBySelf(cli, prefix, host)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := WaitOnTaskCompletion(cli, prefix, pools.CountHosts())
+	if err != nil {
+		return err
+	}
+
+	downloadKey, shutdownKey, systemdKey := rel.getTaskKeys(prefix)
+	if !status.DownloadDone {
+		status.DownloadDone = true
+		tk, _, err := GetTaskStatus(cli, downloadKey)
+		if err != nil {
+			return err
+		}
+		status.CurrentTaskStatus = tk
+	} else if !status.MinioShutdownDone {
+		status.MinioShutdownDone = true
+		tk, _, err := GetTaskStatus(cli, shutdownKey)
+		if err != nil {
+			return err
+		}
+		status.CurrentTaskStatus = tk
+	} else {
+		status.SystemdUpdateDone = true
+		tk, _, err := GetTaskStatus(cli, systemdKey)
+		if err != nil {
+			return err
+		}
+		status.CurrentTaskStatus = tk
+	}
+
+	return nil
 }

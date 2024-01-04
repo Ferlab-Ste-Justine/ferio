@@ -70,3 +70,5 @@ func WaitOnTaskCompletion(cli *client.EtcdClient, taskPrefix string, hostsCount 
 	_, putErr := cli.PutKey(fmt.Sprintf(ETCD_TASK_COMPLETION_KEY, taskPrefix), "true")
 	return putErr
 }
+
+type TaskAction func() error
