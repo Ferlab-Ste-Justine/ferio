@@ -171,3 +171,79 @@ func (upd *PoolsUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, po
 
 	return nil
 }
+
+type ServerPoolsChangeAction func(*MinioServerPools, *MinioRelease) error
+
+func HandleServerPoolsChanges(cli *client.EtcdClient, prefix string, startPools *MinioServerPools, action ServerPoolsChangeAction) <-chan error {
+	errCh := make(chan error)
+	go func() {
+		configKey := fmt.Sprintf(ETCD_POOLS_CONFIG_KEY, prefix)
+
+		pools, rev, getErr := GetMinioServerPools(cli, prefix)
+		if getErr != nil {
+			errCh <- getErr
+			close(errCh)
+			return
+		}
+
+		if (*pools).Version != (*startPools).Version {
+			rel, _, getErr := GetMinioRelease(cli, prefix)
+			if getErr != nil {
+				errCh <- getErr
+				close(errCh)
+				return
+			}
+
+			actErr := action(pools, rel)
+			if actErr != nil {
+				errCh <- actErr
+				close(errCh)
+				return
+			}
+		}
+
+		wcCh := cli.Watch(configKey, client.WatchOptions{
+			Revision: rev + 1,
+			IsPrefix: false,
+			TrimPrefix: false,
+		})
+
+		for info := range wcCh {
+			pools := MinioServerPools{}
+
+			if info.Error != nil {
+				errCh <- info.Error
+				close(errCh)
+				return
+			}
+
+			if len(info.Changes.Deletions) > 0 {
+				errCh <- errors.New("Got an unexpected etcd key deletion while looking for server pools changes")
+				close(errCh)
+				return
+			}
+
+			err := yaml.Unmarshal([]byte(info.Changes.Upserts[configKey].Value), &pools)
+			if err != nil {
+				errCh <- errors.New(fmt.Sprintf("Error parsing the server pools configuration: %s", err.Error()))
+				close(errCh)
+				return
+			}
+
+			rel, _, getErr := GetMinioRelease(cli, prefix)
+			if getErr != nil {
+				errCh <- getErr
+				close(errCh)
+				return
+			}
+
+			actErr := action(&pools, rel)
+			if actErr != nil {
+				errCh <- actErr
+				close(errCh)
+				return
+			}
+		}
+	}()
+	return errCh
+}

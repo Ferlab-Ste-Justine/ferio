@@ -101,8 +101,53 @@ func Startup(cli *client.EtcdClient, conf config.Config) (*etcd.MinioServerPools
 }
 
 func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.MinioServerPools, startRel *etcd.MinioRelease) error {
-	//To do
+	poolsCh := etcd.HandleServerPoolsChanges(
+		cli,
+		conf.Etcd.ConfigPrefix,
+		startPools,
+		func(newPools *etcd.MinioServerPools, currentRel *etcd.MinioRelease) error {
+			minPath := binary.GetMinioPathFromVersion(conf.BinariesDir, currentRel.Version)
+			_, updErr := update.UpdatePools(cli, conf.Etcd.WorkspacePrefix, minPath, newPools, conf.Host)
+			if updErr != nil {
+				return  updErr
+			}
+
+			startErr := systemd.StartMinio()
+			if startErr != nil {
+				return startErr
+			}
+
+			return nil
+		},
+	)
+	relCh := etcd.HandleReleaseChanges(
+		cli,
+		conf.Etcd.ConfigPrefix,
+		startRel,
+		func(newRel *etcd.MinioRelease, currentPools *etcd.MinioServerPools) error {
+			_, updErr := update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, newRel, currentPools, conf.Host)
+			if updErr != nil {
+				return updErr
+			}
+			
+			startErr := systemd.StartMinio()
+			if startErr != nil {
+				return startErr
+			}
+
+			return nil
+		},
+	)
+	
+	select {
+	case poolsErr := <-poolsCh:
+		return poolsErr
+	case relErr := <-relCh:
+		return relErr
+	}
+
 	return nil
+
 }
 
 func main() {

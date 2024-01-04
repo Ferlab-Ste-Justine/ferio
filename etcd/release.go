@@ -128,3 +128,79 @@ func (upd *ReleaseUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, 
 
 	return nil
 }
+
+type ReleaseChangeAction func(*MinioRelease, *MinioServerPools) error
+
+func HandleReleaseChanges(cli *client.EtcdClient, prefix string, startRel *MinioRelease, action ReleaseChangeAction) <-chan error {
+	errCh := make(chan error)
+	go func() {
+		configKey := fmt.Sprintf(ETCD_RELEASE_CONFIG_KEY, prefix)
+
+		rel, rev, getErr := GetMinioRelease(cli, prefix)
+		if getErr != nil {
+			errCh <- getErr
+			close(errCh)
+			return
+		}
+
+		if (*rel).Version != (*startRel).Version {
+			pools, _, getErr := GetMinioServerPools(cli, prefix)
+			if getErr != nil {
+				errCh <- getErr
+				close(errCh)
+				return
+			}
+
+			actErr := action(rel, pools)
+			if actErr != nil {
+				errCh <- actErr
+				close(errCh)
+				return
+			}
+		}
+
+		wcCh := cli.Watch(configKey, client.WatchOptions{
+			Revision: rev + 1,
+			IsPrefix: false,
+			TrimPrefix: false,
+		})
+
+		for info := range wcCh {
+			rel := MinioRelease{}
+
+			if info.Error != nil {
+				errCh <- info.Error
+				close(errCh)
+				return
+			}
+
+			if len(info.Changes.Deletions) > 0 {
+				errCh <- errors.New("Got an unexpected etcd key deletion while looking for release changes")
+				close(errCh)
+				return
+			}
+
+			err := yaml.Unmarshal([]byte(info.Changes.Upserts[configKey].Value), &rel)
+			if err != nil {
+				errCh <- errors.New(fmt.Sprintf("Error parsing the minio release configuration: %s", err.Error()))
+				close(errCh)
+				return
+			}
+
+			pools, _, getErr := GetMinioServerPools(cli, prefix)
+			if getErr != nil {
+				errCh <- getErr
+				close(errCh)
+				return
+			}
+
+			actErr := action(&rel, pools)
+			if actErr != nil {
+				errCh <- actErr
+				close(errCh)
+				return
+			}
+		}
+	}()
+	return errCh
+}
