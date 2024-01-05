@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/Ferlab-Ste-Justine/ferio/etcd"
+	"github.com/Ferlab-Ste-Justine/ferio/logger"
 )
 
 type BinariesCleanupConfig struct {
@@ -24,6 +26,7 @@ type Config struct {
 	SystemdEnvFile  string                `yaml:"systemd_env_file"`
 	Host            string
 	MinioApiPort    int64                 `yaml:"minio_api_port"`
+	LogLevel        string                `yaml:"log_level"`
 }
 
 func getConfigFilePath() string {
@@ -32,6 +35,20 @@ func getConfigFilePath() string {
 		return "config.yml"
 	}
 	return path
+}
+
+func (c *Config) GetLogLevel() int64 {
+	logLevel := strings.ToLower(c.LogLevel)
+	switch logLevel {
+	case "error":
+		return logger.ERROR
+	case "warning":
+		return logger.WARN
+	case "debug":
+		return logger.DEBUG
+	default:
+		return logger.INFO
+	}
 }
 
 func GetConfig() (Config, error) {

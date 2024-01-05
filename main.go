@@ -9,18 +9,21 @@ import (
 	"github.com/Ferlab-Ste-Justine/ferio/config"
 	"github.com/Ferlab-Ste-Justine/ferio/etcd"
 	"github.com/Ferlab-Ste-Justine/ferio/fs"
+	"github.com/Ferlab-Ste-Justine/ferio/logger"
 	"github.com/Ferlab-Ste-Justine/ferio/systemd"
 	"github.com/Ferlab-Ste-Justine/ferio/update"
+	"github.com/Ferlab-Ste-Justine/ferio/utils"
 
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
-func EnsureBinariesDirExist(binsDir string) error {
+func EnsureBinariesDirExist(binsDir string, log logger.Logger) error {
 	binDirExists, binDirExistsErr := fs.PathExists(binsDir)
 	if binDirExistsErr != nil {
 		return binDirExistsErr
 	}
 	if !binDirExists {
+		log.Infof("[main] Creating binary directorty %s", binsDir)
 		mkdirErr := os.MkdirAll(binsDir, 0700)
 		if mkdirErr != nil {
 			return mkdirErr
@@ -52,7 +55,7 @@ func CleanupBinariesDir(binsDir string, conf config.BinariesCleanupConfig) {
 	}()
 }
 
-func Startup(cli *client.EtcdClient, conf config.Config) (*etcd.MinioServerPools, *etcd.MinioRelease, error) {
+func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*etcd.MinioServerPools, *etcd.MinioRelease, error) {	
 	pools, _, poolsErr := etcd.GetMinioServerPools(cli, conf.Etcd.ConfigPrefix)
 	if poolsErr != nil {
 		return nil, nil, poolsErr
@@ -71,6 +74,7 @@ func Startup(cli *client.EtcdClient, conf config.Config) (*etcd.MinioServerPools
 	minPath := binary.GetMinioPathFromVersion(conf.BinariesDir, rel.Version)
 
 	if !serviceExists {
+		log.Infof("[main] Minio service not found. Will generate it")
 		downErr := binary.GetBinary(rel.Url, rel.Version, rel.Checksum, conf.BinariesDir)
 		if downErr != nil {
 			return nil, nil, downErr
@@ -151,36 +155,25 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 }
 
 func main() {
-	conf, configErr := config.GetConfig()
-	if configErr != nil {
-		fmt.Println(configErr.Error())
-		os.Exit(1)
-	}
+	log := logger.Logger{LogLevel: logger.ERROR}
 
-	ensBinDirErr := EnsureBinariesDirExist(conf.BinariesDir)
-	if ensBinDirErr != nil {
-		fmt.Println(ensBinDirErr.Error())
-		os.Exit(1)
-	}
+	conf, configErr := config.GetConfig()
+	utils.AbortOnErr(configErr, log)
+
+	log.LogLevel = conf.GetLogLevel()
+
+	ensBinDirErr := EnsureBinariesDirExist(conf.BinariesDir, log)
+	utils.AbortOnErr(ensBinDirErr, log)
 
 	CleanupBinariesDir(conf.BinariesDir, conf.BinariesCleanup)
 
 	cli, cliErr := etcd.GetClient(conf.Etcd)
-	if cliErr != nil {
-		fmt.Println(cliErr.Error())
-		os.Exit(1)
-	}
+	utils.AbortOnErr(cliErr, log)
 	defer cli.Close()
 
-	startPools, startRel, err := Startup(cli, conf)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	startPools, startRel, StartErr := Startup(cli, conf, log)
+	utils.AbortOnErr(StartErr, log)
 
-	err = RuntimeLoop(cli, conf, startPools, startRel)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	runtimeErr := RuntimeLoop(cli, conf, startPools, startRel)
+	utils.AbortOnErr(runtimeErr, log)
 }
