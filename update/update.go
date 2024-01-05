@@ -19,6 +19,8 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 		return false, nil
 	}
 
+	log.Infof("[update] Detected ongoing server pools update. Will synchronize with other minio nodes to complete it")
+
 	if !upd.AcknowledgmentDone {
 		err := upd.HandleNextTask(
 			cli,
@@ -76,6 +78,8 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 	if upd.IsDone() {
 		return false, nil
 	}
+
+	log.Infof("[update] Detected ongoing minio release update. Will synchronize with other minio nodes to complete it")
 
 	if !upd.DownloadDone {
 		err := upd.HandleNextTask(
