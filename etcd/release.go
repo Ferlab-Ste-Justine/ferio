@@ -5,6 +5,8 @@ import (
 	"fmt"
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/Ferlab-Ste-Justine/ferio/logger"
+
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
@@ -131,9 +133,11 @@ func (upd *ReleaseUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, 
 
 type ReleaseChangeAction func(*MinioRelease, *MinioServerPools) error
 
-func HandleReleaseChanges(cli *client.EtcdClient, prefix string, startRel *MinioRelease, action ReleaseChangeAction) <-chan error {
+func HandleReleaseChanges(cli *client.EtcdClient, prefix string, startRel *MinioRelease, action ReleaseChangeAction, log logger.Logger) <-chan error {
 	errCh := make(chan error)
 	go func() {
+		log.Infof("[etcd] Starting to watch for minio release changes")
+
 		configKey := fmt.Sprintf(ETCD_RELEASE_CONFIG_KEY, prefix)
 
 		rel, rev, getErr := GetMinioRelease(cli, prefix)
@@ -144,6 +148,8 @@ func HandleReleaseChanges(cli *client.EtcdClient, prefix string, startRel *Minio
 		}
 
 		if (*rel).Version != (*startRel).Version {
+			log.Infof("[etcd] Handling new minio release at version %s", (*rel).Version)
+			
 			pools, _, getErr := GetMinioServerPools(cli, prefix)
 			if getErr != nil {
 				errCh <- getErr
@@ -186,6 +192,8 @@ func HandleReleaseChanges(cli *client.EtcdClient, prefix string, startRel *Minio
 				close(errCh)
 				return
 			}
+
+			log.Infof("[etcd] Handling new minio release at version %s", rel.Version)
 
 			pools, _, getErr := GetMinioServerPools(cli, prefix)
 			if getErr != nil {

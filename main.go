@@ -106,6 +106,7 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 
 			return nil
 		},
+		log,
 	)
 	relCh := etcd.HandleReleaseChanges(
 		cli,
@@ -129,6 +130,7 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 
 			return nil
 		},
+		log,
 	)
 	
 	select {

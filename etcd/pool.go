@@ -6,6 +6,8 @@ import (
 	"strings"
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/Ferlab-Ste-Justine/ferio/logger"
+
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
@@ -174,9 +176,11 @@ func (upd *PoolsUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, po
 
 type ServerPoolsChangeAction func(*MinioServerPools, *MinioRelease) error
 
-func HandleServerPoolsChanges(cli *client.EtcdClient, prefix string, startPools *MinioServerPools, action ServerPoolsChangeAction) <-chan error {
+func HandleServerPoolsChanges(cli *client.EtcdClient, prefix string, startPools *MinioServerPools, action ServerPoolsChangeAction, log logger.Logger) <-chan error {
 	errCh := make(chan error)
 	go func() {
+		log.Infof("[etcd] Starting to watch for server pool changes")
+
 		configKey := fmt.Sprintf(ETCD_POOLS_CONFIG_KEY, prefix)
 
 		pools, rev, getErr := GetMinioServerPools(cli, prefix)
@@ -187,6 +191,8 @@ func HandleServerPoolsChanges(cli *client.EtcdClient, prefix string, startPools 
 		}
 
 		if (*pools).Version != (*startPools).Version {
+			log.Infof("[etcd] Handling new server pools configuration at version %s", (*pools).Version)
+
 			rel, _, getErr := GetMinioRelease(cli, prefix)
 			if getErr != nil {
 				errCh <- getErr
@@ -229,6 +235,8 @@ func HandleServerPoolsChanges(cli *client.EtcdClient, prefix string, startPools 
 				close(errCh)
 				return
 			}
+
+			log.Infof("[etcd] Handling new server pools configuration at version %s", pools.Version)
 
 			rel, _, getErr := GetMinioRelease(cli, prefix)
 			if getErr != nil {
