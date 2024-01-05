@@ -13,6 +13,7 @@ import (
 	"github.com/coreos/go-systemd/v22/dbus"
 
 	"github.com/Ferlab-Ste-Justine/ferio/etcd"
+	"github.com/Ferlab-Ste-Justine/ferio/logger"
 )
 
 const SYSTEMD_UNIT_FILES_PATH = "/etc/systemd/system"
@@ -27,7 +28,9 @@ type UnitFileTemplate struct {
 	MinioPath string
 }
 
-func RefreshMinioSystemdUnit(minioPath string, serverPools *etcd.MinioServerPools) error {
+func RefreshMinioSystemdUnit(minioPath string, serverPools *etcd.MinioServerPools, log logger.Logger) error {
+	log.Infof("[systemd] Generating minio unit file and reloading systemd")
+
 	tmpl, tErr := template.New("template").Parse(minioUnitTemplate)
 	if tErr != nil {
 		return tErr
@@ -79,12 +82,15 @@ func MinioServiceExists() (bool, error) {
 	return len(statuses) > 0, nil
 }
 
-func StopMinio() error {
+func StopMinio(log logger.Logger) error {
+	log.Infof("[systemd] Stopping minio service")
+
 	exists, existsErr := MinioServiceExists()
 	if existsErr != nil {
 		return existsErr
 	}
 	if !exists {
+		log.Infof("[systemd] Stopping aborted. Minio service does not exist")
 		return nil
 	}
 	
@@ -113,12 +119,15 @@ func StopMinio() error {
 	return nil
 }
 
-func StartMinio() error {
+func StartMinio(log logger.Logger) error {
+	log.Infof("[systemd] Starting minio service")
+
 	exists, existsErr := MinioServiceExists()
 	if existsErr != nil {
 		return existsErr
 	}
 	if !exists {
+		log.Infof("[systemd] Starting aborted. Minio service does not exist")
 		return nil
 	}
 
