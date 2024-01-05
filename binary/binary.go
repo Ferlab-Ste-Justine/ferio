@@ -129,3 +129,17 @@ func GetMinioPath(binariesDir string) (string, error) {
 
 	return path.Join(binDirs[len(binDirs) - 1], "minio"), nil
 }
+
+func CleanupOldBinaries(binariesDir string) error {
+	binDirs, binDirsErr := fs.GetTopSubDirectories(binariesDir)
+	if binDirsErr != nil {
+		return errors.New(fmt.Sprintf("Error cleaning up minio binaries: %s", binDirsErr.Error()))
+	}
+
+	cleanupErr := fs.KeepLastDirectories(1, binDirs)
+	if cleanupErr != nil {
+		return errors.New(fmt.Sprintf("Error cleaning up minio binaries: %s", cleanupErr.Error()))
+	}
+
+	return nil
+}

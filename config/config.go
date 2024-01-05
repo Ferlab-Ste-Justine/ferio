@@ -6,22 +6,15 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"time"
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/Ferlab-Ste-Justine/ferio/etcd"
 	"github.com/Ferlab-Ste-Justine/ferio/logger"
 )
 
-type BinariesCleanupConfig struct {
-	Interval        time.Duration
-	MaximumBinaries int64         `yaml:"maximum_binaries"`
-}
-
 type Config struct {
 	Etcd            etcd.EtcdConfig
 	BinariesDir     string                `yaml:"binaries_dir"`
-	BinariesCleanup BinariesCleanupConfig `yaml:"binaries_cleanup"`
 	SystemdService  string                `yaml:"systemd_service"`
 	SystemdEnvFile  string                `yaml:"systemd_env_file"`
 	Host            string
@@ -69,14 +62,6 @@ func GetConfig() (Config, error) {
 			return c, errors.New(fmt.Sprintf("Error retrieving hostname: %s", hostnameErr.Error()))
 		}
 		c.Host = hostname
-	}
-
-	if c.BinariesCleanup.MaximumBinaries == 0 {
-		c.BinariesCleanup.MaximumBinaries = 3
-	}
-
-	if c.BinariesCleanup.Interval == 0 {
-		c.BinariesCleanup.Interval = 24 * time.Hour
 	}
 
 	return c, nil

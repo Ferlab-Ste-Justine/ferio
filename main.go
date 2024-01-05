@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"time"
 
 	"github.com/Ferlab-Ste-Justine/ferio/binary"
 	"github.com/Ferlab-Ste-Justine/ferio/config"
@@ -31,28 +29,6 @@ func EnsureBinariesDirExist(binsDir string, log logger.Logger) error {
 	}
 
 	return nil
-}
-
-func CleanupBinariesDir(binsDir string, conf config.BinariesCleanupConfig) {
-	go func() {
-		for true {
-			binDirs, binDirsErr := fs.GetTopSubDirectories(binsDir)
-			if binDirsErr != nil {
-				fmt.Printf("Error cleaning up minio binaries: %s", binDirsErr.Error())
-				time.Sleep(100 * time.Minute)
-				continue
-			}
-
-			cleanupErr := fs.KeepLastDirectories(conf.MaximumBinaries, binDirs)
-			if cleanupErr != nil {
-				fmt.Printf("Error cleaning up minio binaries: %s", cleanupErr.Error())
-				time.Sleep(100 * time.Minute)
-				continue
-			}
-
-			time.Sleep(conf.Interval)
-		}
-	}()
 }
 
 func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*etcd.MinioServerPools, *etcd.MinioRelease, error) {	
@@ -91,14 +67,21 @@ func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*et
 		return nil, nil, updErr
 	}
 
-	_, updErr = update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, rel, pools, conf.Host)
-	if updErr != nil {
-		return nil, nil, updErr
+	updatedRelease, updRelErr := update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, rel, pools, conf.Host)
+	if updRelErr != nil {
+		return nil, nil, updRelErr
 	}
 
 	startErr := systemd.StartMinio()
 	if startErr != nil {
 		return nil, nil, startErr
+	}
+
+	if updatedRelease {
+		cleanupErr := binary.CleanupOldBinaries(conf.BinariesDir)
+		if cleanupErr != nil {
+			return nil, nil, cleanupErr
+		}
 	}
 
 	return pools, rel, nil
@@ -139,6 +122,11 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 				return startErr
 			}
 
+			cleanupErr := binary.CleanupOldBinaries(conf.BinariesDir)
+			if cleanupErr != nil {
+				return cleanupErr
+			}
+
 			return nil
 		},
 	)
@@ -164,8 +152,6 @@ func main() {
 
 	ensBinDirErr := EnsureBinariesDirExist(conf.BinariesDir, log)
 	utils.AbortOnErr(ensBinDirErr, log)
-
-	CleanupBinariesDir(conf.BinariesDir, conf.BinariesCleanup)
 
 	cli, cliErr := etcd.GetClient(conf.Etcd)
 	utils.AbortOnErr(cliErr, log)
