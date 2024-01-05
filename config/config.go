@@ -15,10 +15,7 @@ import (
 type Config struct {
 	Etcd            etcd.EtcdConfig
 	BinariesDir     string                `yaml:"binaries_dir"`
-	SystemdService  string                `yaml:"systemd_service"`
-	SystemdEnvFile  string                `yaml:"systemd_env_file"`
 	Host            string
-	MinioApiPort    int64                 `yaml:"minio_api_port"`
 	LogLevel        string                `yaml:"log_level"`
 }
 
