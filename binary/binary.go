@@ -9,6 +9,7 @@ import (
 	"path"
 
 	"github.com/Ferlab-Ste-Justine/ferio/fs"
+	"github.com/Ferlab-Ste-Justine/ferio/logger"
 )
 
 func downloadBinary(binaryUrl string, binaryPath string, retries int) error {
@@ -70,7 +71,9 @@ func GetMinioPathFromVersion(binariesDir string, minioVersion string) string {
 	return path.Join(binariesDir, minioVersion, "minio")
 }
 
-func GetBinary(minioUrl string, minioVersion string, expectedSha string, binariesDir string) error {
+func GetBinary(minioUrl string, minioVersion string, expectedSha string, binariesDir string, log logger.Logger) error {
+	log.Infof("[binary] Downloading binary version %s from url %s", minioVersion, minioUrl)
+	
 	binDir := path.Join(binariesDir, minioVersion)
 	binPath := path.Join(binDir, "minio")
 	
@@ -86,9 +89,11 @@ func GetBinary(minioUrl string, minioVersion string, expectedSha string, binarie
 		}
 
 		if sha == expectedSha {
+			log.Infof("[binary] Minio binary was already downloaded with matching checksum. Skipping download")
 			return nil
 		}
 
+		log.Infof("[binary] Minio binary was already downloaded, but checksum didn't match. Will delete and re-download")
 		removeErr := os.Remove(binPath)
 		if removeErr != nil {
 			return errors.New(fmt.Sprintf("Error removing bad pre-existing minio download: %s", removeErr.Error()))
@@ -130,11 +135,13 @@ func GetMinioPath(binariesDir string) (string, error) {
 	return path.Join(binDirs[len(binDirs) - 1], "minio"), nil
 }
 
-func CleanupOldBinaries(binariesDir string) error {
+func CleanupOldBinaries(binariesDir string, log logger.Logger) error {
 	binDirs, binDirsErr := fs.GetTopSubDirectories(binariesDir)
 	if binDirsErr != nil {
 		return errors.New(fmt.Sprintf("Error cleaning up minio binaries: %s", binDirsErr.Error()))
 	}
+
+	log.Infof("[binary] Found %d minio binaries. Will delete all, but the most recent", len(binDirs))
 
 	cleanupErr := fs.KeepLastDirectories(1, binDirs)
 	if cleanupErr != nil {

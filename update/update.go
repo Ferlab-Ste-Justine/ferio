@@ -85,7 +85,7 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 			pools,
 			host,
 			func() error {
-				return binary.GetBinary(rel.Url, rel.Version, rel.Checksum, binariesDir)
+				return binary.GetBinary(rel.Url, rel.Version, rel.Checksum, binariesDir, log)
 			},
 		)
 		if err != nil {

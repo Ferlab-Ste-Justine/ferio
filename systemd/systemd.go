@@ -29,7 +29,7 @@ type UnitFileTemplate struct {
 }
 
 func RefreshMinioSystemdUnit(minioPath string, serverPools *etcd.MinioServerPools, log logger.Logger) error {
-	log.Infof("[systemd] Generating minio unit file and reloading systemd")
+	log.Infof("[systemd] Generating minio unit file with binary path %s, server pools '%s', and reloading systemd", minioPath, serverPools.Stringify())
 
 	tmpl, tErr := template.New("template").Parse(minioUnitTemplate)
 	if tErr != nil {

@@ -51,7 +51,7 @@ func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*et
 
 	if !serviceExists {
 		log.Infof("[main] Minio service not found. Will generate it")
-		downErr := binary.GetBinary(rel.Url, rel.Version, rel.Checksum, conf.BinariesDir)
+		downErr := binary.GetBinary(rel.Url, rel.Version, rel.Checksum, conf.BinariesDir, log)
 		if downErr != nil {
 			return nil, nil, downErr
 		}
@@ -78,7 +78,7 @@ func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*et
 	}
 
 	if updatedRelease {
-		cleanupErr := binary.CleanupOldBinaries(conf.BinariesDir)
+		cleanupErr := binary.CleanupOldBinaries(conf.BinariesDir, log)
 		if cleanupErr != nil {
 			return nil, nil, cleanupErr
 		}
@@ -122,7 +122,7 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 				return startErr
 			}
 
-			cleanupErr := binary.CleanupOldBinaries(conf.BinariesDir)
+			cleanupErr := binary.CleanupOldBinaries(conf.BinariesDir, log)
 			if cleanupErr != nil {
 				return cleanupErr
 			}
