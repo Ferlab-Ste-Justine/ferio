@@ -88,7 +88,7 @@ func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*et
 }
 
 func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.MinioServerPools, startRel *etcd.MinioRelease, log logger.Logger) error {
-	poolsCh := etcd.HandleServerPoolsChanges(
+	ch := etcd.HandleChanges(
 		cli,
 		conf.Etcd.ConfigPrefix,
 		startPools,
@@ -106,11 +106,6 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 
 			return nil
 		},
-		log,
-	)
-	relCh := etcd.HandleReleaseChanges(
-		cli,
-		conf.Etcd.ConfigPrefix,
 		startRel,
 		func(newRel *etcd.MinioRelease, currentPools *etcd.MinioServerPools) error {
 			_, updErr := update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, newRel, currentPools, conf.Host, log)
@@ -132,16 +127,9 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 		},
 		log,
 	)
-	
-	select {
-	case poolsErr := <-poolsCh:
-		return poolsErr
-	case relErr := <-relCh:
-		return relErr
-	}
 
-	return nil
-
+	err := <-ch
+	return err
 }
 
 func main() {
