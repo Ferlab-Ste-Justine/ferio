@@ -79,7 +79,7 @@ func MinioServiceExists() (bool, error) {
 		return false, listErr
 	}
 
-	return len(statuses) > 0, nil
+	return len(statuses) > 0 && statuses[0].LoadState != "not-found", nil
 }
 
 func StopMinio(log logger.Logger) error {
