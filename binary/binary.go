@@ -41,7 +41,7 @@ func downloadBinary(binaryUrl string, binaryPath string, retries int) error {
 		return errors.New(fmt.Sprintf("Error downloading minio: Server returned error code %d", res.StatusCode))
 	}
 
-	fsWr, fsErr := os.Create(binaryPath)
+	fsWr, fsErr := os.OpenFile(binaryPath, os.O_CREATE|os.O_WRONLY, 0755)
 	if fsErr != nil {
 		return errors.New(fmt.Sprintf("Error opening writable binary file to download minio: %s", fsErr.Error()))
 	}
@@ -100,7 +100,7 @@ func GetBinary(minioUrl string, minioVersion string, expectedSha string, binarie
 		}
 	}
 
-	mkdirErr := os.MkdirAll(binDir, 0700)
+	mkdirErr := os.MkdirAll(binDir, 0755)
 	if mkdirErr != nil {
 		return errors.New(fmt.Sprintf("Error creating minio download path: %s", mkdirErr.Error()))
 	}

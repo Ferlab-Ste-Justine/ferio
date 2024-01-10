@@ -22,7 +22,7 @@ func EnsureBinariesDirExist(binsDir string, log logger.Logger) error {
 	}
 	if !binDirExists {
 		log.Infof("[main] Creating binary directorty %s", binsDir)
-		mkdirErr := os.MkdirAll(binsDir, 0700)
+		mkdirErr := os.MkdirAll(binsDir, 0755)
 		if mkdirErr != nil {
 			return mkdirErr
 		}
