@@ -6,8 +6,8 @@ import (
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
-const ETCD_TASK_COMPLETION_KEY = "%s/complete"
-const ETCD_TASK_COMPLETERS_PREFIX = "%s/completers/"
+const ETCD_TASK_COMPLETION_KEY = "%scomplete"
+const ETCD_TASK_COMPLETERS_PREFIX = "%scompleters/"
 
 type Task struct {
 	Complete bool
@@ -24,16 +24,14 @@ func (tk *Task) HasToDo(host string) bool {
 	return true
 }
 
-func (tk *Task) CanContinue(pools *MinioServerPools) bool {
-	return tk.Complete || int64(len(tk.Completers)) == pools.CountHosts()
+func (tk *Task) CanContinue(hostsCount int64) bool {
+	return tk.Complete || int64(len(tk.Completers)) == hostsCount
 }
 
 func GetTask(cli *client.EtcdClient, taskPrefix string) (*Task, int64, error) {
 	tk := Task{false, []string{}}
 	
-	gr := client.Group{KeyPrefix: fmt.Sprintf(ETCD_TASK_COMPLETERS_PREFIX, taskPrefix)}
-	
-	members, rev, getErr := cli.GetGroupMembers(gr)
+	members, rev, getErr := cli.GetGroupMembers(fmt.Sprintf(ETCD_TASK_COMPLETERS_PREFIX, taskPrefix))
 	if getErr != nil {
 		return &tk, rev, getErr
 	}
@@ -51,17 +49,14 @@ func GetTask(cli *client.EtcdClient, taskPrefix string) (*Task, int64, error) {
 }
 
 func MarkTaskDoneBySelf(cli *client.EtcdClient, taskPrefix string, host string) error {
-	gr := client.Group{KeyPrefix: fmt.Sprintf(ETCD_TASK_COMPLETERS_PREFIX, taskPrefix), Id: host}
-	return cli.JoinGroup(gr)
+	return cli.JoinGroup(fmt.Sprintf(ETCD_TASK_COMPLETERS_PREFIX, taskPrefix), host, "done")
 }
 
-func WaitOnTaskCompletion(cli *client.EtcdClient, taskPrefix string, hostsCount int64) error {
-	gr := client.Group{KeyPrefix: fmt.Sprintf(ETCD_TASK_COMPLETERS_PREFIX, taskPrefix)}
-	
+func WaitOnTaskCompletion(cli *client.EtcdClient, taskPrefix string, hostsCount int64) error {	
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 	
-	errCh := cli.WaitGroupCountThreshold(gr, hostsCount, doneCh)
+	errCh := cli.WaitGroupCountThreshold(fmt.Sprintf(ETCD_TASK_COMPLETERS_PREFIX, taskPrefix), hostsCount, doneCh)
 	err := <- errCh
 	if err != nil {
 		return err

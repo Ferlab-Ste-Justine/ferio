@@ -36,9 +36,9 @@ func GetMinioRelease(cli *client.EtcdClient, prefix string) (*MinioRelease, int6
 	return &rel, info.ModRevision, nil
 }
 
-const ETCD_RELEASE_TASKS_BINARY_DOWNLOAD_KEY = "%s/tasks/binary/%s/binary_download"
-const ETCD_RELEASE_TASKS_MINIO_SHUTDOWN_KEY = "%s/tasks/binary/%s/minio_shutdown"
-const ETCD_RELEASE_TASKS_SYSTEMD_UPDATE_KEY = "%s/tasks/binary/%s/systemd_update"
+const ETCD_RELEASE_TASKS_BINARY_DOWNLOAD_KEY = "%stasks/release/%s/binary_download/"
+const ETCD_RELEASE_TASKS_MINIO_SHUTDOWN_KEY = "%stasks/release/%s/minio_shutdown/"
+const ETCD_RELEASE_TASKS_SYSTEMD_UPDATE_KEY = "%stasks/release/%s/systemd_update/"
 
 func (rel *MinioRelease) getTaskKeys(prefix string) (string, string, string) {
 	return fmt.Sprintf(ETCD_RELEASE_TASKS_BINARY_DOWNLOAD_KEY, prefix, rel.Version),
@@ -66,7 +66,7 @@ func (rel *MinioRelease) GetUpdate(cli *client.EtcdClient, prefix string, pools 
 			return nil, err
 		}
 
-		if !tk.CanContinue(pools) {
+		if !tk.CanContinue(pools.CountHosts()) {
 			return &ReleaseUpdate{
 				DownloadDone:      key != downloadKey,
 				MinioShutdownDone: key != downloadKey && key != shutdownKey,

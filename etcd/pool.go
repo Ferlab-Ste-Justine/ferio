@@ -79,9 +79,9 @@ func GetMinioServerPools(cli *client.EtcdClient, prefix string) (*MinioServerPoo
 	return &pools, info.ModRevision, nil
 }
 
-const ETCD_POOLS_TASKS_ACKNOWLEDGMENT_KEY = "%s/tasks/pools/%s/acknowledgment"
-const ETCD_POOLS_TASKS_MINIO_SHUTDOWN_KEY = "%s/tasks/pools/%s/minio_shutdown"
-const ETCD_POOLS_TASKS_SYSTEMD_UPDATE_KEY = "%s/tasks/pools/%s/systemd_update"
+const ETCD_POOLS_TASKS_ACKNOWLEDGMENT_KEY = "%stasks/pools/%s/acknowledgment/"
+const ETCD_POOLS_TASKS_MINIO_SHUTDOWN_KEY = "%stasks/pools/%s/minio_shutdown/"
+const ETCD_POOLS_TASKS_SYSTEMD_UPDATE_KEY = "%stasks/pools/%s/systemd_update/"
 
 func (pools *MinioServerPools) getTaskKeys(prefix string) (string, string, string) {
 	return fmt.Sprintf(ETCD_POOLS_TASKS_ACKNOWLEDGMENT_KEY, prefix, pools.Version),
@@ -109,7 +109,7 @@ func (pools *MinioServerPools) GetUpdate(cli *client.EtcdClient, prefix string) 
 			return nil, err
 		}
 
-		if !tk.CanContinue(pools) {
+		if !tk.CanContinue(pools.CountHosts()) {
 			return &PoolsUpdate{
 				AcknowledgmentDone: key != ackKey,
 				MinioShutdownDone: key != ackKey && key != shutdownKey,

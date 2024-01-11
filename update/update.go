@@ -16,12 +16,14 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 	}
 
 	if upd.IsDone() {
+		log.Debugf("[update] Server pools update is done. Skipping it")
 		return false, nil
 	}
 
 	log.Infof("[update] Detected ongoing server pools update. Will synchronize with other minio nodes to complete it")
 
 	if !upd.AcknowledgmentDone {
+		log.Debugf("[update] Synchronizing on server pools update acknowledgment")
 		err := upd.HandleNextTask(
 			cli,
 			prefix,
@@ -37,6 +39,7 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 	}
 
 	if !upd.MinioShutdownDone {
+		log.Debugf("[update] Synchronizing on server pools update minio shutdown")
 		err := upd.HandleNextTask(
 			cli,
 			prefix,
@@ -52,6 +55,7 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 	}
 
 	if !upd.SystemdUpdateDone {
+		log.Debugf("[update] Synchronizing on server pools update systemd unit refresh")
 		err := upd.HandleNextTask(
 			cli,
 			prefix,
@@ -76,12 +80,14 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 	}
 
 	if upd.IsDone() {
+		log.Debugf("[update] Release update is done. Skipping it")
 		return false, nil
 	}
 
 	log.Infof("[update] Detected ongoing minio release update. Will synchronize with other minio nodes to complete it")
 
 	if !upd.DownloadDone {
+		log.Debugf("[update] Synchronizing on release update binary download")
 		err := upd.HandleNextTask(
 			cli,
 			prefix,
@@ -98,6 +104,7 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 	}
 
 	if !upd.MinioShutdownDone {
+		log.Debugf("[update] Synchronizing on release update minio shutdown")
 		err := upd.HandleNextTask(
 			cli,
 			prefix,
@@ -114,6 +121,7 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 	}
 
 	if !upd.SystemdUpdateDone {
+		log.Debugf("[update] Synchronizing on release update systemd unit refresh")
 		err := upd.HandleNextTask(
 			cli,
 			prefix,
