@@ -53,6 +53,16 @@ type ReleaseUpdate struct {
 	CurrentTaskStatus  *Task
 }
 
+func (upd *ReleaseUpdate) GetTaskKey(prefix string, rel *MinioRelease) string  {
+	if !upd.DownloadDone {
+		return fmt.Sprintf(ETCD_RELEASE_TASKS_BINARY_DOWNLOAD_KEY, prefix, rel.Version)
+	} else if !upd.MinioShutdownDone {
+		return fmt.Sprintf(ETCD_RELEASE_TASKS_MINIO_SHUTDOWN_KEY, prefix, rel.Version)
+	}
+
+	return fmt.Sprintf(ETCD_RELEASE_TASKS_SYSTEMD_UPDATE_KEY, prefix, rel.Version)
+}
+
 func (upd *ReleaseUpdate) IsDone() bool {
 	return upd.DownloadDone && upd.MinioShutdownDone && upd.SystemdUpdateDone
 }
@@ -85,45 +95,43 @@ func (rel *MinioRelease) GetUpdate(cli *client.EtcdClient, prefix string, pools 
 }
 
 func (upd *ReleaseUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, rel *MinioRelease, pools *MinioServerPools, host string, action TaskAction) error {	
+	tkKey := upd.GetTaskKey(prefix, rel)
+	
 	if upd.CurrentTaskStatus.HasToDo(host) {
 		err := action()
 		if err != nil {
 			return err
 		}
 
-		err = MarkTaskDoneBySelf(cli, prefix, host)
+		err = MarkTaskDoneBySelf(cli, tkKey, host)
 		if err != nil {
 			return err
 		}
 	}
 
-	err := WaitOnTaskCompletion(cli, prefix, pools.CountHosts())
+	err := WaitOnTaskCompletion(cli, tkKey, pools.CountHosts())
 	if err != nil {
 		return err
 	}
 
-	downloadKey, shutdownKey, systemdKey := rel.getTaskKeys(prefix)
+	_, shutdownKey, systemdKey := rel.getTaskKeys(prefix)
 	if !upd.DownloadDone {
 		upd.DownloadDone = true
-		tk, _, err := GetTask(cli, downloadKey)
+		tk, _, err := GetTask(cli, shutdownKey)
 		if err != nil {
 			return err
 		}
 		upd.CurrentTaskStatus = tk
 	} else if !upd.MinioShutdownDone {
 		upd.MinioShutdownDone = true
-		tk, _, err := GetTask(cli, shutdownKey)
+		tk, _, err := GetTask(cli, systemdKey)
 		if err != nil {
 			return err
 		}
 		upd.CurrentTaskStatus = tk
 	} else {
 		upd.SystemdUpdateDone = true
-		tk, _, err := GetTask(cli, systemdKey)
-		if err != nil {
-			return err
-		}
-		upd.CurrentTaskStatus = tk
+		upd.CurrentTaskStatus = nil
 	}
 
 	return nil

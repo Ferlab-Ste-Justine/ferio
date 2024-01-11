@@ -96,6 +96,16 @@ type PoolsUpdate struct {
 	CurrentTaskStatus  *Task
 }
 
+func (upd *PoolsUpdate) GetTaskKey(prefix string, pools *MinioServerPools) string  {
+	if !upd.AcknowledgmentDone {
+		return fmt.Sprintf(ETCD_POOLS_TASKS_ACKNOWLEDGMENT_KEY, prefix, pools.Version)
+	} else if !upd.MinioShutdownDone {
+		return fmt.Sprintf(ETCD_POOLS_TASKS_MINIO_SHUTDOWN_KEY, prefix, pools.Version)
+	}
+
+	return fmt.Sprintf(ETCD_POOLS_TASKS_SYSTEMD_UPDATE_KEY, prefix, pools.Version)
+}
+
 func (upd *PoolsUpdate) IsDone() bool {
 	return upd.AcknowledgmentDone && upd.MinioShutdownDone && upd.SystemdUpdateDone
 }
@@ -127,46 +137,44 @@ func (pools *MinioServerPools) GetUpdate(cli *client.EtcdClient, prefix string) 
 	}, nil
 }
 
-func (upd *PoolsUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, pools *MinioServerPools, host string, action TaskAction) error {	
+func (upd *PoolsUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, pools *MinioServerPools, host string, action TaskAction) error {
+	tkKey := upd.GetTaskKey(prefix, pools)
+	
 	if upd.CurrentTaskStatus.HasToDo(host) {
 		err := action()
 		if err != nil {
 			return err
 		}
 
-		err = MarkTaskDoneBySelf(cli, prefix, host)
+		err = MarkTaskDoneBySelf(cli, tkKey, host)
 		if err != nil {
 			return err
 		}
 	}
 
-	err := WaitOnTaskCompletion(cli, prefix, pools.CountHosts())
+	err := WaitOnTaskCompletion(cli, tkKey, pools.CountHosts())
 	if err != nil {
 		return err
 	}
 
-	ackKey, shutdownKey, systemdKey := pools.getTaskKeys(prefix)
+	_, shutdownKey, systemdKey := pools.getTaskKeys(prefix)
 	if !upd.AcknowledgmentDone {
 		upd.AcknowledgmentDone = true
-		tk, _, err := GetTask(cli, ackKey)
+		tk, _, err := GetTask(cli, shutdownKey)
 		if err != nil {
 			return err
 		}
 		upd.CurrentTaskStatus = tk
 	} else if !upd.MinioShutdownDone {
 		upd.MinioShutdownDone = true
-		tk, _, err := GetTask(cli, shutdownKey)
+		tk, _, err := GetTask(cli, systemdKey)
 		if err != nil {
 			return err
 		}
 		upd.CurrentTaskStatus = tk
 	} else {
 		upd.SystemdUpdateDone = true
-		tk, _, err := GetTask(cli, systemdKey)
-		if err != nil {
-			return err
-		}
-		upd.CurrentTaskStatus = tk
+		upd.CurrentTaskStatus = nil
 	}
 
 	return nil
