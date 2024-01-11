@@ -1,1 +1,10 @@
 ferio
+test/.terraform
+test/certs/
+test/etcd0-data/
+test/etcd1-data/
+test/etcd2-data/
+test/etcd-logs/
+test/.terraform.lock.hcl
+test/terraform.tfstate
+test/terraform.tfstate.backup

@@ -25,7 +25,7 @@ func (tk *Task) HasToDo(host string) bool {
 }
 
 func (tk *Task) CanContinue(hostsCount int64) bool {
-	return tk.Complete || int64(len(tk.Completers)) == hostsCount
+	return tk.Complete || int64(len(tk.Completers)) >= hostsCount
 }
 
 func GetTask(cli *client.EtcdClient, taskPrefix string) (*Task, int64, error) {
