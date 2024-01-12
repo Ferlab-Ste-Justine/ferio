@@ -1,0 +1,30 @@
+name: test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+      - name: Setup etcd
+        run: |
+          wget -O /tmp/etcd.tar.gz https://github.com/etcd-io/etcd/releases/download/v3.5.8/etcd-v3.5.8-linux-amd64.tar.gz 
+          echo "d4c1b8d90ad53658f12ffc293afc5694b7bc6cb093af609188649a799e1cc8dc /tmp/etcd.tar.gz" | sha256sum --check
+          mkdir /tmp/etcd
+          tar xzvf /tmp/etcd.tar.gz -C /tmp/etcd
+          cp /tmp/etcd/etcd-v3.5.8-linux-amd64/etcd /usr/local/bin/etcd
+      - name: Setup go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20.0'
+      - name: Setup Etcd Certificates
+        working-directory: ./test
+        run: terraform init && terraform apply -auto-approve
+      - name: Run etcd tests
+        working-directory: ./etcd
+        run: go test
+      
