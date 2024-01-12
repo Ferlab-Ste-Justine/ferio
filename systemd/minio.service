@@ -5,7 +5,7 @@ After=network-online.target
 StartLimitIntervalSec=0
 
 [Service]
-Environment=MINIO_VOLUMES={{.ServerPools}}
+Environment=MINIO_VOLUMES="{{.ServerPools}}"
 EnvironmentFile=-/etc/minio/env
 User=minio
 Group=minio
