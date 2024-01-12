@@ -9,8 +9,6 @@ import (
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
-const ETCD_BINARIES_CONFIG_PREFIX = "%sbinaries/"
-
 type EtcdConfig struct {
 	ConfigPrefix      string        `yaml:"config_prefix"`
 	WorkspacePrefix   string        `yaml:"workspace_prefix"`
