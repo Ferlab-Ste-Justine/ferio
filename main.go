@@ -56,7 +56,8 @@ func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*et
 			return nil, nil, downErr
 		}
 
-		refrErr := systemd.RefreshMinioSystemdUnit(minPath, pools, log)
+		unitTpl := systemd.UnitFileTemplate{minPath, pools.Stringify()}
+		refrErr := systemd.RefreshMinioSystemdUnit(&unitTpl, log)
 		if refrErr != nil {
 			return nil, nil, refrErr
 		}

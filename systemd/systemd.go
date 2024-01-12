@@ -7,12 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"text/template"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 
-	"github.com/Ferlab-Ste-Justine/ferio/etcd"
+	"github.com/Ferlab-Ste-Justine/ferio/fs"
 	"github.com/Ferlab-Ste-Justine/ferio/logger"
 )
 
@@ -24,12 +25,48 @@ var (
 )
 
 type UnitFileTemplate struct {
-	ServerPools string
 	MinioPath string
+	ServerPools string
 }
 
-func RefreshMinioSystemdUnit(minioPath string, serverPools *etcd.MinioServerPools, log logger.Logger) error {
-	log.Infof("[systemd] Generating minio unit file with binary path %s, server pools '%s', and reloading systemd", minioPath, serverPools.Stringify())
+func DeleteMinioSystemdUnit(log logger.Logger) error {
+	exists, existsErr := fs.PathExists(path.Join(SYSTEMD_UNIT_FILES_PATH, "minio.service"))
+	if existsErr != nil {
+		return existsErr
+	}
+
+	if !exists {
+		return nil
+	}
+
+	log.Infof("[systemd] Deleting minio unit file")
+
+	stopErr := StopMinio(log)
+	if stopErr != nil {
+		return stopErr
+	}
+
+	remErr := os.Remove(path.Join(SYSTEMD_UNIT_FILES_PATH, "minio.service"))
+	if remErr != nil {
+		return remErr
+	}
+
+	conn, connErr := dbus.NewSystemdConnectionContext(context.Background())
+	if connErr != nil {
+		return connErr
+	}
+	defer conn.Close()
+
+	reloadErr := conn.Reload()
+	if reloadErr != nil {
+		return reloadErr
+	}
+
+	return nil
+}
+
+func RefreshMinioSystemdUnit(tpl *UnitFileTemplate, log logger.Logger) error {
+	log.Infof("[systemd] Generating minio unit file with binary path %s, server pools '%s', and reloading systemd", tpl.MinioPath, tpl.ServerPools)
 
 	tmpl, tErr := template.New("template").Parse(minioUnitTemplate)
 	if tErr != nil {
@@ -37,10 +74,7 @@ func RefreshMinioSystemdUnit(minioPath string, serverPools *etcd.MinioServerPool
 	}
 
 	var b bytes.Buffer
-	exErr := tmpl.Execute(&b, &UnitFileTemplate{
-		MinioPath: minioPath,
-		ServerPools: serverPools.Stringify(),
-	})
+	exErr := tmpl.Execute(&b, tpl)
 	if exErr != nil {
 		return exErr
 	}

@@ -62,7 +62,8 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 			pools,
 			host,
 			func() error {
-				return systemd.RefreshMinioSystemdUnit(minioPath, pools, log)
+				unitTpl := systemd.UnitFileTemplate{minioPath, pools.Stringify()}
+				return systemd.RefreshMinioSystemdUnit(&unitTpl, log)
 			},
 		)
 		if err != nil {
@@ -129,7 +130,11 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 			pools,
 			host,
 			func() error {
-				return systemd.RefreshMinioSystemdUnit(binary.GetMinioPathFromVersion(binariesDir, rel.Version), pools, log)
+				unitTpl := systemd.UnitFileTemplate{
+					binary.GetMinioPathFromVersion(binariesDir, rel.Version),
+					pools.Stringify(),
+				}
+				return systemd.RefreshMinioSystemdUnit(&unitTpl, log)
 			},
 		)
 		if err != nil {
