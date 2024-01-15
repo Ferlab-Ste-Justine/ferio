@@ -1,6 +1,8 @@
 #!/bin/bash
 echo "Waiting to be terminated..."
-while sleep 1
+trap "sleep 5 && echo 'terminating' && exit 0" TERM
+
+while true
 do
-    trap "echo 'terminating...' && sleep 5 && exit 0" TERM
+    sleep 5
 done
