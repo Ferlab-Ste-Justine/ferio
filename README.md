@@ -32,6 +32,12 @@ Beyond the update to the release and server pools occuring when the cluster firs
 
 Info level logs will make the update status of various ferio instances very clear. Basic alert-oriented prometheus metrics are likely to be added in the future as well.
 
+# Expectations
+
+Ferio expects a file named **/etc/minio/env** to exist and to contain minio environment variables. The file should contain an environment variable called **MINIO_OPTS** that should contain all command line arguments to pass to the **minio server** command. The file should not contain the **MINIO_VOLUMES** environment variable as ferio will manage this variable itself based on the configuration it reads from etcd.
+
+Ferio also expects a user and group called **minio** to exist on the system. The minio service will run under this user.
+
 # Etcd Keyspace
 
 Given an etcd key prefix of `/myconfprefix/`, the minio configuration in the etcd store is expected to have the following keyspace format:

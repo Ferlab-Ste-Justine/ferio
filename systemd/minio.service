@@ -12,7 +12,7 @@ Group=minio
 Type=simple
 Restart=always
 RestartSec=1
-ExecStart={{.MinioPath}} server --certs-dir /etc/minio/tls
+ExecStart={{.MinioPath}} server $MINIO_OPTS
 
 [Install]
 WantedBy=multi-user.target
