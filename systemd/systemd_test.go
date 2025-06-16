@@ -7,21 +7,26 @@ import (
 	"testing"
 
 	"github.com/Ferlab-Ste-Justine/ferio/logger"
+	"github.com/Ferlab-Ste-Justine/ferio/pool"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 )
+
+func getDefaultService() MinioService {
+	return MinioService{Name: "minio", EnvPath: "/etc/minio/env", DataPath: ""}
+}
 
 func TestExistsRefresh(t *testing.T) {
 	log := logger.Logger{LogLevel: logger.ERROR}
 
 	defer func() {
-		delErr := DeleteMinioSystemdUnit(log)
+		delErr := DeleteMinioSystemdUnit(getDefaultService(), log)
 		if delErr != nil {
 			t.Errorf("Error occured cleaning up minio service: %s", delErr.Error())
 		}
 	}()
 
-	exists, existsErr := MinioServiceExists()
+	exists, existsErr := MinioServiceExists(getDefaultService())
 	if existsErr != nil {
 		t.Errorf("Error determining existence of minio service: %s", existsErr.Error())
 	}
@@ -36,13 +41,12 @@ func TestExistsRefresh(t *testing.T) {
 	}
 	binDir := path.Join(curDir, "test.sh")
 
-	tpl := UnitFileTemplate{binDir, "No matter"}
-	refErr := RefreshMinioSystemdUnit(&tpl, log)
+	refErr := RefreshMinioSystemdUnit("/bin/minio", pool.MinioServerPools{}, getDefaultService(), log)
 	if refErr != nil {
 		t.Errorf("Error refreshing minio unit file: %s", refErr.Error())
 	}
 
-	exists, existsErr = MinioServiceExists()
+	exists, existsErr = MinioServiceExists(getDefaultService())
 	if existsErr != nil {
 		t.Errorf("Error determining existence of minio service: %s", existsErr.Error())
 	}
@@ -56,13 +60,13 @@ func TestStartStop(t *testing.T) {
 	log := logger.Logger{LogLevel: logger.ERROR}
 
 	defer func() {
-		delErr := DeleteMinioSystemdUnit(log)
+		delErr := DeleteMinioSystemdUnit(getDefaultService(), log)
 		if delErr != nil {
 			t.Errorf("Error occured cleaning up minio service: %s", delErr.Error())
 		}
 	}()
 
-	exists, existsErr := MinioServiceExists()
+	exists, existsErr := MinioServiceExists(getDefaultService())
 	if existsErr != nil {
 		t.Errorf("Error determining existence of minio service: %s", existsErr.Error())
 	}
@@ -77,8 +81,7 @@ func TestStartStop(t *testing.T) {
 	}
 	binDir := path.Join(curDir, "test.sh")
 
-	tpl := UnitFileTemplate{binDir, "No matter"}
-	refErr := RefreshMinioSystemdUnit(&tpl, log)
+	refErr := RefreshMinioSystemdUnit("/bin/minio", pool.MinioServerPools{}, getDefaultService(), log)
 	if refErr != nil {
 		t.Errorf("Error refreshing minio unit file: %s", refErr.Error())
 	}
@@ -89,7 +92,7 @@ func TestStartStop(t *testing.T) {
 	}
 	defer conn.Close()
 
-	startErr := StartMinio(log)
+	startErr := StartMinioService(getDefaultService(), log)
 	if startErr != nil {
 		t.Errorf("Error starting mock minio: %s", startErr.Error())
 	}
@@ -103,7 +106,7 @@ func TestStartStop(t *testing.T) {
 		t.Errorf("Expected active state after start to be active or activating and it was: %s", statuses[0].ActiveState)
 	}
 
-	stopErr := StopMinio(log)
+	stopErr := StopMinioService(getDefaultService(), log)
 	if stopErr != nil {
 		t.Errorf("Error stopping mock minio: %s", stopErr.Error())
 	}

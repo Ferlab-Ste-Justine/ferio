@@ -3,60 +3,18 @@ package etcd
 import (
 	"errors"
 	"fmt"
-	"strings"
 	yaml "gopkg.in/yaml.v2"
+
+	"github.com/Ferlab-Ste-Justine/ferio/pool"
 
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
 const ETCD_POOLS_CONFIG_KEY = "%spools"
 
-type MinioServerPool struct {
-	ApiPort           int64  `yaml:"api_port"`
-	DomainTemplate    string `yaml:"domain_template"`
-	ServerCountBegin  int64  `yaml:"server_count_begin"`
-	ServerCountEnd    int64  `yaml:"server_count_end"`
-	MountPathTemplate string `yaml:"mount_path_template"`
-	MountCount        int64  `yaml:"mount_count"`
-}
-
-func (pool *MinioServerPool) Stringify() string {
-	urls := fmt.Sprintf(
-		"https://%s:%d",
-		fmt.Sprintf(
-			pool.DomainTemplate,
-			fmt.Sprintf("{%d...%d}", pool.ServerCountBegin, pool.ServerCountEnd),
-		),
-		pool.ApiPort,
-	)
-	mounts := fmt.Sprintf(
-		pool.MountPathTemplate,
-		fmt.Sprintf("{1...%d}", pool.MountCount),
-	)
-
-	return fmt.Sprintf("%s%s", urls, mounts)
-}
-
 type MinioServerPools struct {
 	Version string
-	Pools   []MinioServerPool
-}
-
-func (pools *MinioServerPools) CountHosts() int64 {
-	count := int64(0)
-	for _, pool := range (*pools).Pools {
-		count += (pool.ServerCountEnd - pool.ServerCountBegin + 1)
-	}
-	return count
-}
-
-func (pools *MinioServerPools) Stringify() string {
-	stringifiedPools := []string{}
-	for _, pool := range (*pools).Pools {
-		stringifiedPools = append(stringifiedPools, pool.Stringify())
-	}
-
-	return strings.Join(stringifiedPools, " ")
+	Pools   pool.MinioServerPools
 }
 
 func GetMinioServerPools(cli *client.EtcdClient, prefix string) (*MinioServerPools, int64, error) {
@@ -119,7 +77,7 @@ func (pools *MinioServerPools) GetUpdate(cli *client.EtcdClient, prefix string) 
 			return nil, err
 		}
 
-		if !tk.CanContinue(pools.CountHosts()) {
+		if !tk.CanContinue(pools.Pools.CountHosts()) {
 			return &PoolsUpdate{
 				AcknowledgmentDone: key != ackKey,
 				MinioShutdownDone: key != ackKey && key != shutdownKey,
@@ -152,7 +110,7 @@ func (upd *PoolsUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, po
 		}
 	}
 
-	err := WaitOnTaskCompletion(cli, tkKey, pools.CountHosts())
+	err := WaitOnTaskCompletion(cli, tkKey, pools.Pools.CountHosts())
 	if err != nil {
 		return err
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/Ferlab-Ste-Justine/etcd-sdk/client"
 )
 
-func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools *etcd.MinioServerPools, host string, log logger.Logger) (bool, error) {
+func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools *etcd.MinioServerPools, host string, services []systemd.MinioService, log logger.Logger) (bool, error) {
 	upd, updErr := pools.GetUpdate(cli, prefix)
 	if updErr != nil {
 		return false, updErr
@@ -46,7 +46,7 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 			pools,
 			host,
 			func() error {
-				return systemd.StopMinio(log)
+				return systemd.StopMinioServices(services, log)
 			},
 		)
 		if err != nil {
@@ -62,8 +62,7 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 			pools,
 			host,
 			func() error {
-				unitTpl := systemd.UnitFileTemplate{minioPath, pools.Stringify()}
-				return systemd.RefreshMinioSystemdUnit(&unitTpl, log)
+				return systemd.RefreshMinioSystemdUnits(minioPath, pools.Pools, services, log)
 			},
 		)
 		if err != nil {
@@ -74,7 +73,7 @@ func UpdatePools(cli *client.EtcdClient, prefix string, minioPath string, pools 
 	return true, nil
 }
 
-func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, rel *etcd.MinioRelease, pools *etcd.MinioServerPools, host string, log logger.Logger) (bool, error) {
+func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, rel *etcd.MinioRelease, pools *etcd.MinioServerPools, host string, services []systemd.MinioService, log logger.Logger) (bool, error) {
 	upd, updErr := rel.GetUpdate(cli, prefix, pools)
 	if updErr != nil {
 		return false, updErr
@@ -113,7 +112,7 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 			pools,
 			host,
 			func() error {
-				return systemd.StopMinio(log)
+				return systemd.StopMinioServices(services, log)
 			},
 		)
 		if err != nil {
@@ -130,11 +129,7 @@ func UpdateRelease(cli *client.EtcdClient, prefix string, binariesDir string, re
 			pools,
 			host,
 			func() error {
-				unitTpl := systemd.UnitFileTemplate{
-					binary.GetMinioPathFromVersion(binariesDir, rel.Version),
-					pools.Stringify(),
-				}
-				return systemd.RefreshMinioSystemdUnit(&unitTpl, log)
+				return systemd.RefreshMinioSystemdUnits(binary.GetMinioPathFromVersion(binariesDir, rel.Version), pools.Pools, services, log)
 			},
 		)
 		if err != nil {

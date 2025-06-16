@@ -6,7 +6,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Environment=MINIO_VOLUMES="{{.ServerPools}}"
-EnvironmentFile=-/etc/minio/env
+EnvironmentFile=-{{.EnvPath}}
 User=minio
 Group=minio
 Type=simple

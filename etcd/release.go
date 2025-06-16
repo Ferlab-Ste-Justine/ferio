@@ -76,7 +76,7 @@ func (rel *MinioRelease) GetUpdate(cli *client.EtcdClient, prefix string, pools 
 			return nil, err
 		}
 
-		if !tk.CanContinue(pools.CountHosts()) {
+		if !tk.CanContinue(pools.Pools.CountHosts()) {
 			return &ReleaseUpdate{
 				DownloadDone:      key != downloadKey,
 				MinioShutdownDone: key != downloadKey && key != shutdownKey,
@@ -109,7 +109,7 @@ func (upd *ReleaseUpdate) HandleNextTask(cli *client.EtcdClient, prefix string, 
 		}
 	}
 
-	err := WaitOnTaskCompletion(cli, tkKey, pools.CountHosts())
+	err := WaitOnTaskCompletion(cli, tkKey, pools.Pools.CountHosts())
 	if err != nil {
 		return err
 	}

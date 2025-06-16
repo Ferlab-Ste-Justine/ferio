@@ -10,13 +10,15 @@ import (
 
 	"github.com/Ferlab-Ste-Justine/ferio/etcd"
 	"github.com/Ferlab-Ste-Justine/ferio/logger"
+	"github.com/Ferlab-Ste-Justine/ferio/systemd"
 )
 
 type Config struct {
 	Etcd            etcd.EtcdConfig
-	BinariesDir     string                `yaml:"binaries_dir"`
+	BinariesDir     string                 `yaml:"binaries_dir"`
 	Host            string
-	LogLevel        string                `yaml:"log_level"`
+	LogLevel        string                 `yaml:"log_level"`
+	MinioServices   []systemd.MinioService `yaml:"minio_services"`
 }
 
 func getConfigFilePath() string {
@@ -59,6 +61,15 @@ func GetConfig() (Config, error) {
 			return c, errors.New(fmt.Sprintf("Error retrieving hostname: %s", hostnameErr.Error()))
 		}
 		c.Host = hostname
+	}
+
+	if len(c.MinioServices) == 0 {
+		c.MinioServices = []systemd.MinioService{
+			systemd.MinioService{
+				Name: "minio.service",
+				EnvPath: "/etc/minio/env",
+			},
+		}
 	}
 
 	return c, nil

@@ -42,7 +42,7 @@ func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*et
 		return nil, nil, relErr
 	}
 
-	serviceExists, serviceExistsErr := systemd.MinioServiceExists()
+	serviceExists, serviceExistsErr := systemd.MinioServicesExists(conf.MinioServices)
 	if serviceExistsErr != nil {
 		return nil, nil, serviceExistsErr
 	}
@@ -56,24 +56,23 @@ func Startup(cli *client.EtcdClient, conf config.Config, log logger.Logger) (*et
 			return nil, nil, downErr
 		}
 
-		unitTpl := systemd.UnitFileTemplate{minPath, pools.Stringify()}
-		refrErr := systemd.RefreshMinioSystemdUnit(&unitTpl, log)
+		refrErr := systemd.RefreshMinioSystemdUnits(minPath, pools.Pools, conf.MinioServices, log)
 		if refrErr != nil {
 			return nil, nil, refrErr
 		}
 	}
 
-	_, updErr := update.UpdatePools(cli, conf.Etcd.WorkspacePrefix, minPath, pools, conf.Host, log)
+	_, updErr := update.UpdatePools(cli, conf.Etcd.WorkspacePrefix, minPath, pools, conf.Host, conf.MinioServices, log)
 	if updErr != nil {
 		return nil, nil, updErr
 	}
 
-	updatedRelease, updRelErr := update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, rel, pools, conf.Host, log)
+	updatedRelease, updRelErr := update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, rel, pools, conf.Host, conf.MinioServices, log)
 	if updRelErr != nil {
 		return nil, nil, updRelErr
 	}
 
-	startErr := systemd.StartMinio(log)
+	startErr := systemd.StartMinioServices(conf.MinioServices, log)
 	if startErr != nil {
 		return nil, nil, startErr
 	}
@@ -95,12 +94,12 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 		startPools,
 		func(newPools *etcd.MinioServerPools, currentRel *etcd.MinioRelease) error {
 			minPath := binary.GetMinioPathFromVersion(conf.BinariesDir, currentRel.Version)
-			_, updErr := update.UpdatePools(cli, conf.Etcd.WorkspacePrefix, minPath, newPools, conf.Host, log)
+			_, updErr := update.UpdatePools(cli, conf.Etcd.WorkspacePrefix, minPath, newPools, conf.Host, conf.MinioServices, log)
 			if updErr != nil {
 				return  updErr
 			}
 
-			startErr := systemd.StartMinio(log)
+			startErr := systemd.StartMinioServices(conf.MinioServices, log)
 			if startErr != nil {
 				return startErr
 			}
@@ -109,12 +108,12 @@ func RuntimeLoop(cli *client.EtcdClient, conf config.Config, startPools *etcd.Mi
 		},
 		startRel,
 		func(newRel *etcd.MinioRelease, currentPools *etcd.MinioServerPools) error {
-			_, updErr := update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, newRel, currentPools, conf.Host, log)
+			_, updErr := update.UpdateRelease(cli, conf.Etcd.WorkspacePrefix, conf.BinariesDir, newRel, currentPools, conf.Host, conf.MinioServices, log)
 			if updErr != nil {
 				return updErr
 			}
 			
-			startErr := systemd.StartMinio(log)
+			startErr := systemd.StartMinioServices(conf.MinioServices, log)
 			if startErr != nil {
 				return startErr
 			}
