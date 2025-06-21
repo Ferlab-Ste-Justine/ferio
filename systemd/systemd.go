@@ -42,6 +42,7 @@ func (service *MinioService) GetUnitName() string {
 
 type UnitFileTemplate struct {
 	MinioPath string
+	EnvPath string
 	ServerPools string
 }
 
@@ -102,6 +103,7 @@ func RefreshMinioSystemdUnit(minioPath string, pools pool.MinioServerPools, serv
 
 	tpl := &UnitFileTemplate{
 		MinioPath: minioPath,
+		EnvPath: service.EnvPath,
 		ServerPools: pools.Stringify(service.DataPath),
 	}
 
