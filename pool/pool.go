@@ -2,7 +2,6 @@ package pool
 
 import (
 	"fmt"
-	"path"
 	"strings"
 )
 
@@ -13,6 +12,14 @@ type MinioServerPool struct {
 	ServerCountEnd    int64  `yaml:"server_count_end"`
 	MountPathTemplate string `yaml:"mount_path_template"`
 	MountCount        int64  `yaml:"mount_count"`
+}
+
+func joinPoolDir(pool string, dir string) string {
+	if strings.HasPrefix(dir, "/") {
+		return fmt.Sprintf("%s%s", pool, dir)
+	} else {
+		return fmt.Sprintf("%s/%s", pool, dir)
+	}
 }
 
 func (pool *MinioServerPool) Stringify(dir string) string {
@@ -31,9 +38,13 @@ func (pool *MinioServerPool) Stringify(dir string) string {
 
 	res := fmt.Sprintf("%s%s", urls, mounts)
 
+	fmt.Println("Volume pool debug, part1: ", res)
+
 	if dir != "" {
-		res = path.Join(res, dir)
+		res = joinPoolDir(res, dir)
 	}
+
+	fmt.Println("Volume pool debug, part2: ", res)
 
 	return res
 }
