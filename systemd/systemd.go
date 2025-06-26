@@ -27,9 +27,9 @@ var (
 )
 
 type MinioService struct {
-	Name    string
-	Tenant  string `yaml:"tenant"`
-	EnvPath string `yaml:"env_path"`
+	Name       string
+	TenantName string `yaml:"tenant_name"`
+	EnvPath    string `yaml:"env_path"`
 }
 
 func (service *MinioService) GetUnitName() string {
@@ -94,7 +94,7 @@ func DeleteMinioSystemdUnits(services []MinioService, log logger.Logger) error {
 }
 
 func RefreshMinioSystemdUnit(minioPath string, pools pool.MinioServerPools, service MinioService, log logger.Logger) error {
-	log.Infof("[systemd] Generating %s unit file with binary path %s, server pools '%s', and reloading systemd", service.Name, minioPath, pools.Stringify(service.Tenant))
+	log.Infof("[systemd] Generating %s unit file with binary path %s, server pools '%s', and reloading systemd", service.Name, minioPath, pools.Stringify(service.TenantName))
 
 	tmpl, tErr := template.New("template").Parse(minioUnitTemplate)
 	if tErr != nil {
@@ -104,7 +104,7 @@ func RefreshMinioSystemdUnit(minioPath string, pools pool.MinioServerPools, serv
 	tpl := &UnitFileTemplate{
 		MinioPath: minioPath,
 		EnvPath: service.EnvPath,
-		ServerPools: pools.Stringify(service.Tenant),
+		ServerPools: pools.Stringify(service.TenantName),
 	}
 
 	var b bytes.Buffer

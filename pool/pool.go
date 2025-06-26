@@ -6,9 +6,9 @@ import (
 )
 
 type ServerPoolTenant struct {
-	Tenant   string
-	ApiPort  int64
-	DataPath string
+	Name     string
+	ApiPort  int64  `yaml:"api_port"`
+	DataPath string `yaml:"data_path"`
 }
 
 type MinioServerPool struct {
@@ -29,30 +29,30 @@ func joinPoolDir(pool string, dir string) string {
 	}
 }
 
-func (pool *MinioServerPool) getTenant(tenant string) ServerPoolTenant {
-	if tenant == "" {
+func (pool *MinioServerPool) getTenant(tenantName string) ServerPoolTenant {
+	if tenantName == "" {
 		return ServerPoolTenant{
-			Tenant: "",
+			Name: "",
 			ApiPort: pool.ApiPort,
 			DataPath: "",
 		}
 	}
 
 	for _, poolTenant := range pool.Tenants {
-		if tenant == poolTenant.Tenant {
+		if tenantName == poolTenant.Name {
 			return poolTenant
 		}
 	}
 
 	return ServerPoolTenant{
-		Tenant: "",
+		Name: "",
 		ApiPort: pool.ApiPort,
 		DataPath: "",
 	}
 }
 
-func (pool *MinioServerPool) Stringify(tenant string) string {
-	poolTenant := pool.getTenant(tenant)
+func (pool *MinioServerPool) Stringify(tenantName string) string {
+	poolTenant := pool.getTenant(tenantName)
 
 	urls := fmt.Sprintf(
 		"https://%s:%d",
@@ -86,10 +86,10 @@ func (pools *MinioServerPools) CountHosts() int64 {
 	return count
 }
 
-func (pools *MinioServerPools) Stringify(tenant string) string {
+func (pools *MinioServerPools) Stringify(tenantName string) string {
 	stringifiedPools := []string{}
 	for _, pool := range *pools {
-		stringifiedPools = append(stringifiedPools, pool.Stringify(tenant))
+		stringifiedPools = append(stringifiedPools, pool.Stringify(tenantName))
 	}
 
 	return strings.Join(stringifiedPools, " ")
