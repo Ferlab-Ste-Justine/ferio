@@ -5,13 +5,20 @@ import (
 	"strings"
 )
 
+type ServerPoolTenant struct {
+	Tenant   string
+	ApiPort  int64
+	DataPath string
+}
+
 type MinioServerPool struct {
-	ApiPort           int64  `yaml:"api_port"`
-	DomainTemplate    string `yaml:"domain_template"`
-	ServerCountBegin  int64  `yaml:"server_count_begin"`
-	ServerCountEnd    int64  `yaml:"server_count_end"`
-	MountPathTemplate string `yaml:"mount_path_template"`
-	MountCount        int64  `yaml:"mount_count"`
+	ApiPort           int64              `yaml:"api_port"`
+	Tenants           []ServerPoolTenant
+	DomainTemplate    string             `yaml:"domain_template"`
+	ServerCountBegin  int64              `yaml:"server_count_begin"`
+	ServerCountEnd    int64              `yaml:"server_count_end"`
+	MountPathTemplate string             `yaml:"mount_path_template"`
+	MountCount        int64              `yaml:"mount_count"`
 }
 
 func joinPoolDir(pool string, dir string) string {
@@ -22,14 +29,38 @@ func joinPoolDir(pool string, dir string) string {
 	}
 }
 
-func (pool *MinioServerPool) Stringify(dir string) string {
+func (pool *MinioServerPool) getTenant(tenant string) ServerPoolTenant {
+	if tenant == "" {
+		return ServerPoolTenant{
+			Tenant: "",
+			ApiPort: pool.ApiPort,
+			DataPath: "",
+		}
+	}
+
+	for _, poolTenant := range pool.Tenants {
+		if tenant == poolTenant.Tenant {
+			return poolTenant
+		}
+	}
+
+	return ServerPoolTenant{
+		Tenant: "",
+		ApiPort: pool.ApiPort,
+		DataPath: "",
+	}
+}
+
+func (pool *MinioServerPool) Stringify(tenant string) string {
+	poolTenant := pool.getTenant(tenant)
+
 	urls := fmt.Sprintf(
 		"https://%s:%d",
 		fmt.Sprintf(
 			pool.DomainTemplate,
 			fmt.Sprintf("{%d...%d}", pool.ServerCountBegin, pool.ServerCountEnd),
 		),
-		pool.ApiPort,
+		poolTenant.ApiPort,
 	)
 	mounts := fmt.Sprintf(
 		pool.MountPathTemplate,
@@ -38,13 +69,9 @@ func (pool *MinioServerPool) Stringify(dir string) string {
 
 	res := fmt.Sprintf("%s%s", urls, mounts)
 
-	fmt.Println("Volume pool debug, part1: ", res)
-
-	if dir != "" {
-		res = joinPoolDir(res, dir)
+	if poolTenant.DataPath != "" {
+		res = joinPoolDir(res, poolTenant.DataPath)
 	}
-
-	fmt.Println("Volume pool debug, part2: ", res)
 
 	return res
 }
@@ -59,10 +86,10 @@ func (pools *MinioServerPools) CountHosts() int64 {
 	return count
 }
 
-func (pools *MinioServerPools) Stringify(dir string) string {
+func (pools *MinioServerPools) Stringify(tenant string) string {
 	stringifiedPools := []string{}
 	for _, pool := range *pools {
-		stringifiedPools = append(stringifiedPools, pool.Stringify(dir))
+		stringifiedPools = append(stringifiedPools, pool.Stringify(tenant))
 	}
 
 	return strings.Join(stringifiedPools, " ")
