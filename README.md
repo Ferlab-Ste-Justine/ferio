@@ -34,36 +34,42 @@ Info level logs will make the update status of various ferio instances very clea
 
 # Expectations
 
-Ferio expects a file named **/etc/minio/env** to exist and to contain minio environment variables. The file should contain an environment variable called **MINIO_OPTS** that should contain all command line arguments to pass to the **minio server** command. The file should not contain the **MINIO_VOLUMES** environment variable as ferio will manage this variable itself based on the configuration it reads from etcd.
+Ferio also expects a user and group called **minio** to exist on the system. All minio serviced managed by ferio will run under this user.
 
-Ferio also expects a user and group called **minio** to exist on the system. The minio service will run under this user.
+Ferio also expects most minio settings for the services it manages to be pre-specified in environment files. See the **minio_services** part of the configuration for details.
 
 # Etcd Keyspace
 
-Given an etcd key prefix of `/myconfprefix/`, the minio configuration in the etcd store is expected to have the following keyspace format:
+Given an etcd key prefix of `/myconfprefix/`, the minio configuration in the etcd store is expected to have two keys with pre-determined suffixes.
 
-```
-key: /myconfprefix/release
-content:
-  version: Version of the minio binary. Should be a strictly increasing string like the yyyy-mm-dd date format for example.
-  url: Url where the minio binary can be downloaded
-  checksum: sha256 checksum of the minio binary to download
+Ferio will read and react to changes on the two keys listed below. Any other keys in the prefix will be ignored.
 
-key: /myconfprefix/pools
-content:
-  version: Version of the configuration. Should be a strictly increasing string like the yyyy-mm-dd date format for example.
-  pools:
-    - api_port: Api port the minio servers in the first pool will listen on
-      domain_template: Domain template of the first server pool with a string place holder for the servers count range expansion. For example, an input of "server%s.minio.ferlab.lan" will be expanded by ferio to "server{<count begin>...<count end>}.minio.ferlab.lan"
-      server_count_begin: Should be an integer marking the domain of the first server in the first pool.
-      server_count_end: Should be an integer marking the domain of the last server in the first pool
-      mount_path_template: Path template of the disk paths on each server in the first pool, with a string placeholder for the count expansion. For example, an input of "/opt/mnt/volume%s" will be expanded to "/opt/mnt/volume{1...<mount count>}"
-      mount_count: Number of mounted volumes on each server in the server in the first pool
-    - Same config format as first entry, but for the second servers pool
-    ...
-```
+## Release
 
-Ferio will read and react to changes on the above keys. Any other keys in the prefix will be ignored.
+**key**: /myconfprefix/release
+
+**Fields**:
+  - **version**: Version of the minio binary. Should be a strictly increasing string like the yyyy-mm-dd date format for example.
+  - **url**: Url where the minio binary can be downloaded
+  - **checksum**: sha256 checksum of the minio binary to download
+
+## Pools
+
+**key**: /myconfprefix/pools
+
+**Fields**:
+  - **version**: Version of the configuration. Should be a strictly increasing string like the yyyy-mm-dd date format for example.
+  - **pools**: Array of minio server pools, each entry contains the following fields...
+    - **domain_template**: Domain template of the first server pool with a string place holder for the servers count range expansion. For example, an input of "server%s.minio.ferlab.lan" will be expanded by ferio to "server{<count begin>...<count end>}.minio.ferlab.lan"
+    - **server_count_begin**: Should be an integer marking the domain of the first server in the first pool.
+    - **server_count_end**: Should be an integer marking the domain of the last server in the first pool
+    - **mount_path_template**: Path template of the disk paths on each server in the first pool, with a string placeholder for the count expansion. For example, an input of "/opt/mnt/volume%s" will be expanded to "/opt/mnt/volume{1...<mount count>}"
+    - **mount_count**: Number of mounted volumes on each server in the server in the first pool
+    - **api_port**: Default api port the minio servers in the pool will expose. If no tenants are specified, this api port will be used in the pool's configuration.
+    - **tenants**: Optional tenants list to configure pools for separate sets of minio servers sharing disks (by using separate paths in their filesystem). Each entry should have the following keys:
+      - **name**: Name of the tenant
+      - **api_port**: Api ports the servers on the pool will be exposing
+      - **data_path**: Path of the data, relative to the mount point of the disks. This is the directory used by the tenant on each disk in the pool.
 
 # Configuration
 
@@ -74,6 +80,10 @@ The configuration format is:
 - **binaries_dir**: Directory where ferio will download minio binaries
 - **host**: Unique host entry of the node ferio runs on. If empty, the os hostname will be used
 - **log_level**: Cutoff level of logging to show. Can be debug, info, warning or error
+- **minio_services**: Array on minio services to manage on each node. For a single tenant setup, there can be a single entry. Omitting this field will result in a single entry with the **name** of **minio.service**, **env_path** of **/etc/minio/env** and **tenant_name** being empty. This corresponds to how ferio behaved before multi-tenancy was introduced and should be compatible with older setups. Otherwise, each entry should have the following fields:
+  - **name**: Name of the service's systemd unit. Note that if **.service** is not a suffix for the name, it ferio will append it to the inputed value.
+  - **tenant_name**: Name of the service's tenant which will be matched with the identical `pools[..].tenants[..].name` value in the ferio pools etcd key to figure out how to configure the volume pools for the minio service.
+  - **env_path**: Path to the file containing minio environment variables. The file should contain an environment variable called **MINIO_OPTS** that should contain all command line arguments to pass to the **minio server** command. The file should not contain the **MINIO_VOLUMES** environment variable as ferio will manage this variable itself based on the configuration it reads from etcd.
 - **etcd**: Parameters for the etcd connection. It takes the parameters listed below...
   - **config_prefix**: Key prefix to use for the externally updated minio configuration
   - **workspace_prefix**: Key prefix to use as an internal workspace for update synchronization between ferio instances across nodes
